@@ -1,0 +1,49 @@
+# Production: the app, its database and automatic HTTPS (Caddy).
+#
+#   1. Point a domain (e.g. work.yourcompany.com) at the server.
+#   2. Create a .env next to this file:
+#        DOMAIN=work.yourcompany.com
+#        POSTGRES_PASSWORD=<long random string>
+#   3. docker compose -f docker-compose.prod.yml up -d --build
+#
+# Without a domain (office LAN), set DOMAIN=:80 and COOKIE_SECURE=false.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: tracker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://tracker:${POSTGRES_PASSWORD}@db:5432/tracker
+      APP_URL: https://${DOMAIN}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in .env} --to app:3000
+    volumes:
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  caddy_data:
