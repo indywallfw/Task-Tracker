@@ -22,6 +22,13 @@
       "when": 1795545006188,
       "tag": "0002_leads",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795590020936,
+      "tag": "0003_task_fields",
+      "breakpoints": true
     }
   ]
 }

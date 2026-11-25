@@ -10,10 +10,13 @@ import type { Priority, TaskStatus } from "@/db/schema";
  * Imports a Notion "Markdown & CSV" export (.zip).
  *
  * - Every .md page becomes a doc; the folder structure becomes the page tree.
+ *   Child folders may be named with or without the page's Notion id
+ *   ("Tasks 1a2b…/" or just "Tasks/"); both are handled.
  * - Links between exported pages are rewritten to point at the new docs.
  * - Each database (.csv) either becomes a project of tasks (when it has a
  *   Status-like column and `databasesAsTasks` is on) or a doc with a table,
- *   with the row pages nested under it.
+ *   with the row pages nested under it. Task databases keep their other
+ *   columns as project fields, shown in the table view.
  * - Images and attachments are not copied (their alt text is kept).
  */
 
@@ -173,7 +176,8 @@ export async function importNotionExport(
   // Folder "X abc/" holds the children of page "X abc.md".
   type PageInfo = { key: string; parentKey: string | null; title: string; body: string };
   const pages = new Map<string, PageInfo>();
-  const rowPagesByFolder = new Map<string, Map<string, string>>(); // folder -> title -> md body
+  type RowPage = { key: string; body: string; props: Record<string, string> };
+  const rowPagesByFolder = new Map<string, Map<string, RowPage>>(); // database key -> title -> row page
 
   for (const f of mdFiles) {
     const key = stripExt(f.path);
@@ -206,20 +210,45 @@ export async function importNotionExport(
     }
   }
 
+  // Newer exports name a page's child folder without the id ("Tasks/" next to
+  // "Tasks 1a2b….md"), so map each id-less folder back to its page or database.
+  const folderOwner = new Map<string, string | null>(); // folder -> owning key (null = ambiguous)
+  for (const key of new Set([...pages.keys(), ...dbFolders.keys()])) {
+    const segs = key.split("/");
+    const bare = [...segs.slice(0, -1), cleanName(segs[segs.length - 1])].join("/");
+    if (bare === key) continue;
+    const prev = folderOwner.get(bare);
+    folderOwner.set(bare, prev === undefined || prev === key ? key : null);
+  }
+  const ownerOf = (folder: string) => {
+    if (pages.has(folder) || dbFolders.has(folder)) return folder;
+    return folderOwner.get(folder) ?? folder;
+  };
+  for (const p of pages.values()) if (p.parentKey) p.parentKey = ownerOf(p.parentKey);
+
   // Row pages of a task database become task descriptions, not docs.
-  for (const [folder, info] of dbFolders) {
+  const csvByKey = new Map(csvs.map((c) => [stripExt(c.file.path), c]));
+  for (const [dbKey, info] of dbFolders) {
     if (info.kind !== "tasks") continue;
-    const byTitle = new Map<string, string>();
+    const headers = new Set(csvByKey.get(dbKey)!.headers.map((x) => x.trim().toLowerCase()));
+    const byTitle = new Map<string, RowPage>();
     for (const [key, p] of pages) {
-      if (key.startsWith(folder + "/") && dirOf(key) === folder) {
-        // drop the "Property: value" lines Notion puts at the top of row pages (already in the CSV)
-        const lines = p.body.split("\n");
-        while (lines.length && (/^[^:\n]{1,60}:\s.*$/.test(lines[0]) || lines[0].trim() === "")) lines.shift();
-        byTitle.set(p.title.toLowerCase(), lines.join("\n"));
-        pages.delete(key);
+      if (p.parentKey !== dbKey) continue;
+      // the "Property: value" lines Notion puts at the top of row pages (already in the CSV)
+      const lines = p.body.split("\n");
+      const props: Record<string, string> = {};
+      while (lines.length) {
+        const m = lines[0].match(/^([^:\n]{1,60}):\s(.*)$/);
+        if (m && headers.has(m[1].trim().toLowerCase())) props[m[1].trim().toLowerCase()] = m[2].trim();
+        else if (lines[0].trim() !== "") break;
+        lines.shift();
       }
+      if (!byTitle.has(p.title.toLowerCase())) byTitle.set(p.title.toLowerCase(), { key, body: lines.join("\n"), props });
+      pages.delete(key);
     }
-    rowPagesByFolder.set(folder, byTitle);
+    rowPagesByFolder.set(dbKey, byTitle);
+    // the database's own page only holds a link to the CSV and the view settings
+    pages.delete(dbKey);
   }
 
   // ---- create doc rows (ids first, content after, so links can be rewritten) ----
@@ -301,50 +330,76 @@ export async function importNotionExport(
     const assigneeCol = findCol(h, [/^assign/i, /^owner/i, /^person/i, /^responsible/i]);
     const dueCol = findCol(h, [/^due/i, /deadline/i, /^date$/i]);
     const prioCol = findCol(h, [/priority/i]);
-    const used = new Set([titleCol, statusCol, assigneeCol, dueCol, prioCol]);
+    const rows = c.rows.filter((r) => (r[titleCol] ?? "").trim());
+    const rowPages = rowPagesByFolder.get(folder) ?? new Map<string, RowPage>();
+
+    // Notion's unique ID column ("Task ID" = 133, shown as IW-133) becomes the task number
+    const idCol = findCol(h, [/^task id$/i, /^id$/i, /\bid$/i]);
+    const ids = idCol ? rows.map((r) => Number((r[idCol] ?? "").trim())) : [];
+    const useIds = !!idCol && ids.every((n) => Number.isInteger(n) && n > 0) && new Set(ids).size === ids.length;
+    let prefix: string | undefined;
+    if (useIds) {
+      for (const rp of rowPages.values()) {
+        const m = rp.props[idCol!.trim().toLowerCase()]?.match(/^([A-Z][A-Z0-9]{0,5})-\d+$/);
+        if (m) {
+          prefix = m[1];
+          break;
+        }
+      }
+    }
+    const prefixFree =
+      !!prefix && !(await db.select({ id: projects.id }).from(projects).where(eq(projects.key, prefix))).length;
+    const key = prefixFree ? prefix! : await uniqueProjectKey(name);
+
     // the original status is worth keeping when it has no direct equivalent here
     const keepStatus = (v: string) => /blocked|ready|gate/i.test(v);
+    const keptStatus = !!statusCol && rows.some((r) => keepStatus(r[statusCol] ?? ""));
+    const mapped = new Set([titleCol, statusCol, assigneeCol, dueCol, prioCol, useIds ? idCol : undefined]);
+    const fields = h.filter((k) => !mapped.has(k) && k.trim());
+    if (keptStatus) fields.push("Notion status");
 
     const [proj] = await db
       .insert(projects)
       .values({
         name: name.slice(0, 80),
-        key: await uniqueProjectKey(name),
+        key,
         description: "Imported from Notion",
+        fields,
         createdById: opts.userId,
       })
       .returning({ id: projects.id });
     summary.projects++;
 
-    const rowPages = rowPagesByFolder.get(folder) ?? new Map();
     let n = 0;
-    for (const r of c.rows) {
-      const title = (r[titleCol] ?? "").trim();
-      if (!title) continue;
-      const rowBody = rowPages.get(title.toLowerCase()) ?? "";
-      const extra = h
-        .filter((k) => (!used.has(k) || (k === statusCol && keepStatus(r[k] ?? ""))) && (r[k] ?? "").trim())
-        .map((k) => `<li><strong>${escapeHtml(k)}:</strong> ${escapeHtml(r[k])}</li>`)
-        .join("");
-      const description = (extra ? `<ul>${extra}</ul>` : "") + (rowBody ? toHtml(rowBody, folder + "/x") : "");
+    for (const [i, r] of rows.entries()) {
+      const title = r[titleCol].trim();
+      const rowPage = rowPages.get(title.toLowerCase());
+      const rowBody = rowPage?.body.trim() ?? "";
+      const properties: Record<string, string> = {};
+      for (const f of fields) {
+        const v = f === "Notion status" ? (keepStatus(r[statusCol!] ?? "") ? r[statusCol!] : "") : r[f];
+        if ((v ?? "").trim()) properties[f] = v.trim();
+      }
       const assigneeName = assigneeCol ? r[assigneeCol] : undefined;
       const assigneeId = findPerson(assigneeName);
       if (assigneeName && !assigneeId && !summary.warnings.some((w) => w.includes(`"${assigneeName}"`))) {
         summary.warnings.push(`No user matches assignee "${assigneeName}" — those tasks were left unassigned.`);
       }
       const status = mapStatus(statusCol ? r[statusCol] : undefined);
-      n++;
+      const number = useIds ? ids[i] : i + 1;
+      n = Math.max(n, number);
       await db.insert(tasks).values({
         projectId: proj.id,
-        number: n,
+        number,
         title: title.slice(0, 300),
-        description,
+        description: rowBody ? toHtml(rowBody, rowPage!.key) : "",
+        properties,
         status,
         priority: mapPriority(prioCol ? r[prioCol] : undefined),
         assigneeId,
         dueDate: parseDate(dueCol ? r[dueCol] : undefined),
         creatorId: opts.userId,
-        position: n * 1000,
+        position: (i + 1) * 1000,
         completedAt: status === "done" ? new Date() : null,
       });
       summary.tasks++;

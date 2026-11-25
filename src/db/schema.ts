@@ -5,6 +5,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -96,6 +97,8 @@ export const projects = pgTable("projects", {
   description: text("description").notNull().default(""),
   archived: boolean("archived").notNull().default(false),
   taskCounter: integer("task_counter").notNull().default(0),
+  // extra columns shown in the table view, in order (e.g. imported Notion properties)
+  fields: text("fields").array().notNull().default(sql`'{}'::text[]`),
   createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,
 });
@@ -139,6 +142,8 @@ export const tasks = pgTable(
     linkedDocId: uuid("linked_doc_id").references(() => docs.id, { onDelete: "set null" }),
     // follow-up tasks created from a lead
     leadId: uuid("lead_id").references((): AnyPgColumn => leads.id, { onDelete: "set null" }),
+    // values for the project's extra fields, keyed by field name
+    properties: jsonb("properties").$type<Record<string, string>>().notNull().default({}),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
   },

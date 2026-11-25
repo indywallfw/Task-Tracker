@@ -230,6 +230,7 @@ export function buildMcpServer(me: CurrentUser) {
       return json({
         ...taskSummary(t),
         description: htmlToText(full.description),
+        properties: full.properties,
         linkedDocId: full.linkedDocId,
         createdAt: full.createdAt,
         comments: thread,

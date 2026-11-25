@@ -8,8 +8,9 @@ import { requireUser } from "@/lib/auth";
 import { getActiveUsers } from "@/lib/data";
 import { PRIORITIES, STATUSES } from "@/lib/constants";
 import { addComment, deleteComment, deleteTask, updateTask } from "@/actions/tasks";
+import { updateTaskProperty } from "@/actions/task-properties";
 import { ActionForm } from "@/components/action-form";
-import { AutoSubmitInput, AutoSubmitSelect } from "@/components/auto-submit";
+import { AutoSubmitInput, AutoSubmitSelect, SubmitOnBlurTextarea } from "@/components/auto-submit";
 import { Avatar } from "@/components/avatar";
 import { ConfirmButton } from "@/components/confirm-button";
 import { TaskDescription } from "@/components/task-description";
@@ -156,6 +157,21 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
             <AutoSubmitInput className="input py-1.5" type="date" name="dueDate" defaultValue={task.dueDate ?? ""} />
           </form>
         </Property>
+        {project.fields.map((f) => (
+          <Property key={f} label={f}>
+            <form action={updateTaskProperty}>
+              <input type="hidden" name="id" value={task.id} />
+              <input type="hidden" name="field" value={f} />
+              <SubmitOnBlurTextarea
+                className="input py-1.5 text-sm"
+                name="value"
+                rows={Math.min(8, Math.max(1, Math.ceil((task.properties[f]?.length ?? 0) / 32)))}
+                defaultValue={task.properties[f] ?? ""}
+                placeholder="Empty"
+              />
+            </form>
+          </Property>
+        ))}
         <Property label="Linked doc">
           <form action={updateTask}>
             <input type="hidden" name="id" value={task.id} />

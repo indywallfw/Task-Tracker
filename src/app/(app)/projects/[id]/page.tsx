@@ -10,7 +10,7 @@ import { STATUSES } from "@/lib/constants";
 import { setProjectArchived, updateProject } from "@/actions/tasks";
 import { PageHeader } from "@/components/page-header";
 import { Kanban } from "@/components/kanban";
-import { TaskList } from "@/components/task-list";
+import { TaskTable, parseSort } from "@/components/task-table";
 import { QuickAddTask } from "@/components/quick-add-task";
 
 const isId = (v: string) => z.string().uuid().safeParse(v).success;
@@ -33,6 +33,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const view = sp.view === "list" ? "list" : "board";
   const assignee = typeof sp.assignee === "string" ? sp.assignee : undefined;
   const q = typeof sp.q === "string" ? sp.q.trim() : undefined;
+  const sort = parseSort(sp.sort, project.fields);
 
   const where = [eq(tasks.projectId, id), assigneeFilter(assignee, user.id), titleFilter(q)].filter(
     Boolean,
@@ -41,7 +42,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
 
   const link = (patch: Record<string, string | undefined>) => {
     const next = new URLSearchParams();
-    const merged = { view, assignee, q, ...patch };
+    const merged = { view, assignee, q, sort: sp.sort === undefined ? undefined : String(sp.sort), ...patch };
     Object.entries(merged).forEach(([k, v]) => v && next.set(k, v));
     return `/projects/${id}?${next}`;
   };
@@ -97,7 +98,12 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
       {view === "board" ? (
         <Kanban tasks={rows} statuses={STATUSES.map((s) => ({ value: s.value, label: s.label, dot: s.dot }))} />
       ) : (
-        <TaskList tasks={rows} showProject={false} />
+        <TaskTable
+          tasks={rows}
+          fields={project.fields}
+          sort={sort}
+          sortHref={(s) => link({ sort: s })}
+        />
       )}
 
       <details className="mt-10 max-w-xl">
@@ -111,6 +117,19 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           <div>
             <label className="label" htmlFor="pdesc">Description</label>
             <textarea className="input" id="pdesc" name="description" rows={2} defaultValue={project.description} />
+          </div>
+          <div>
+            <label className="label" htmlFor="pfields">Table fields</label>
+            <textarea
+              className="input font-mono text-xs"
+              id="pfields"
+              name="fields"
+              rows={Math.max(3, project.fields.length + 1)}
+              defaultValue={project.fields.join("\n")}
+            />
+            <p className="mt-1 text-xs text-stone-500">
+              One per line, in column order. Extra columns shown in the list view, like Category or Effort.
+            </p>
           </div>
           <button className="btn-secondary">Save</button>
         </form>

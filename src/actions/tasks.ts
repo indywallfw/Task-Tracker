@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { comments, db, projects, tasks } from "@/db";
 import type { Priority, TaskStatus } from "@/db/schema";
 import { insertTask } from "@/lib/task-service";
@@ -55,7 +55,13 @@ export async function updateProject(formData: FormData) {
   const id = z.string().uuid().parse(formData.get("id"));
   const name = z.string().trim().min(1).max(80).parse(formData.get("name"));
   const description = z.string().trim().max(2000).parse(formData.get("description") ?? "");
-  await db.update(projects).set({ name, description }).where(eq(projects.id, id));
+  const patch: { name: string; description: string; fields?: string[] } = { name, description };
+  if (formData.has("fields")) {
+    // one field per line; keep order, drop blanks and duplicates
+    const lines = String(formData.get("fields")).split(/\r?\n/).map((l) => l.trim().slice(0, 60)).filter(Boolean);
+    patch.fields = [...new Set(lines)].slice(0, 30);
+  }
+  await db.update(projects).set(patch).where(eq(projects.id, id));
   revalidatePath("/", "layout");
 }
 

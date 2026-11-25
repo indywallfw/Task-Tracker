@@ -16,6 +16,7 @@ export type TaskCard = {
   projectId: string;
   projectKey: string;
   projectName: string;
+  properties: Record<string, string>;
 };
 
 const assignee = alias(users, "assignee");
@@ -35,6 +36,7 @@ export async function queryTasks(where: SQL[]): Promise<TaskCard[]> {
       projectId: tasks.projectId,
       projectKey: projects.key,
       projectName: projects.name,
+      properties: tasks.properties,
     })
     .from(tasks)
     .innerJoin(projects, eq(projects.id, tasks.projectId))
