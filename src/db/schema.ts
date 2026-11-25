@@ -232,6 +232,93 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   comments: many(comments),
 }));
 
+/** Personal to-do lists (like Todoist projects). To-dos without a list are in the Inbox. */
+export const todoLists = pgTable(
+  "todo_lists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // a key from TODO_COLORS
+    color: text("color").notNull().default("stone"),
+    position: doublePrecision("position").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index("todo_lists_user_idx").on(t.userId)],
+);
+
+/** Personal to-dos, private to their owner. */
+export const todos = pgTable(
+  "todos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    listId: uuid("list_id").references(() => todoLists.id, { onDelete: "set null" }),
+    // sub-items
+    parentId: uuid("parent_id").references((): AnyPgColumn => todos.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    notes: text("notes").notNull().default(""),
+    dueDate: date("due_date"),
+    // "HH:MM", only with a due date
+    dueTime: text("due_time"),
+    // 1 (highest) to 4 (none), like Todoist's p1–p4
+    priority: integer("priority").notNull().default(4),
+    labels: text("labels").array().notNull().default(sql`'{}'::text[]`),
+    // a RECURRENCES key, e.g. "daily", "weekdays", "weekly", "monthly", "yearly"
+    recurrence: text("recurrence"),
+    position: doublePrecision("position").notNull().default(0),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("todos_user_idx").on(t.userId),
+    index("todos_list_idx").on(t.listId),
+    index("todos_parent_idx").on(t.parentId),
+  ],
+);
+
+/** Calendar events created in the app. */
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    allDay: boolean("all_day").notNull().default(false),
+    location: text("location").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    // a RECURRENCES key; repeats until `repeatUntil` (inclusive) or forever
+    recurrence: text("recurrence"),
+    repeatUntil: date("repeat_until"),
+    // a key from TODO_COLORS
+    color: text("color").notNull().default("blue"),
+    ...timestamps,
+  },
+  (t) => [index("events_user_idx").on(t.userId), index("events_starts_idx").on(t.startsAt)],
+);
+
+/** A person's linked Google account, used to show their Google Calendar events (read-only). */
+export const googleAccounts = pgTable("google_accounts", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessToken: text("access_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+  // which of their calendars to show
+  calendarIds: text("calendar_ids").array().notNull().default(sql`'{primary}'::text[]`),
+  ...timestamps,
+});
+
 export const commentsRelations = relations(comments, ({ one }) => ({
   task: one(tasks, { fields: [comments.taskId], references: [tasks.id] }),
   author: one(users, { fields: [comments.authorId], references: [users.id] }),
@@ -248,5 +335,8 @@ export type Doc = typeof docs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type LeadStage = (typeof leadStageEnum.enumValues)[number];
 export type TaskStatus = (typeof taskStatusEnum.enumValues)[number];
+export type Todo = typeof todos.$inferSelect;
+export type TodoList = typeof todoLists.$inferSelect;
+export type CalendarEvent = typeof events.$inferSelect;
 export type Priority = (typeof priorityEnum.enumValues)[number];
 

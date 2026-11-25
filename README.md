@@ -3,6 +3,8 @@
 In-house task tracker and docs wiki, built to replace Notion. It includes:
 
 - **Projects & tasks**: kanban board and list views, assignees, due dates, priorities, comments, and per-project numbering (`OPS-12`).
+- **To-dos**: a private, Todoist-style list for each person. Inbox, Today, Upcoming and Completed views, your own lists and labels, sub-items, and repeating to-dos. Quick add understands plain English: “Pay rent every month p1”, “Call Sam tomorrow 5pm #Work @phone”.
+- **Calendar**: month and week views of your own events (with repeats), your to-dos, team tasks assigned to you, and optionally your Google Calendar (read-only).
 - **Docs**: nested pages with a rich-text editor (headings, checklists, tables, links), autosave and search.
 - **Leads (CRM)**: a pipeline board from New to Won/Lost, with contact details, product interest, source, owner, next follow-up date, an activity log, and follow-up tasks. Your follow-ups due this week show on My work.
 - **People & roles**: admins add teammates, set roles and switch off access. There is no public sign-up.
@@ -25,6 +27,23 @@ npm run dev                   # http://localhost:3000
 On first visit you'll be asked to create the admin account. Database migrations run automatically when the server starts.
 
 Database changes: edit `src/db/schema.ts`, then run `npm run db:generate` and commit the new file in `drizzle/`.
+
+## Google Calendar (optional)
+
+Each person can show their Google Calendar events next to their own (read-only). To turn it on once for the server:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), enable the **Google Calendar API**, set up the OAuth consent screen, and create an OAuth client of type **Web application**.
+2. Add `https://work.yourcompany.com/api/google/callback` (or `http://localhost:3000/api/google/callback` locally) as an authorised redirect URI.
+3. Add to `.env` and restart:
+   ```
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   APP_URL=https://work.yourcompany.com
+   ```
+
+Then everyone uses **Connect Google Calendar** on the Calendar page. Refresh tokens are stored in the database, so keep backups private.
+
+Calendar times and "today" use the server's time zone. On a server, set `TZ` (for example `TZ=Asia/Kolkata`) in the environment.
 
 ## Deploy to a server
 
