@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { desc, ilike, or } from "drizzle-orm";
 import { db, docs, tasks } from "@/db";
+import { leadFilters, queryLeads } from "@/lib/leads";
+import { LeadList } from "@/components/lead-list";
 import { requireUser } from "@/lib/auth";
 import { queryTasks } from "@/lib/tasks-query";
 import { PageHeader } from "@/components/page-header";
@@ -16,12 +18,12 @@ function snippet(text: string, q: string) {
 }
 
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {
-  await requireUser();
+  const user = await requireUser();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const pattern = `%${q.replace(/[%_]/g, "\\$&")}%`;
 
-  const [docHits, taskHits] = q
+  const [docHits, taskHits, leadHits] = q
     ? await Promise.all([
         db
           .select({ id: docs.id, title: docs.title, icon: docs.icon, text: docs.contentText })
@@ -30,14 +32,15 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           .orderBy(desc(docs.updatedAt))
           .limit(30),
         queryTasks([or(ilike(tasks.title, pattern), ilike(tasks.description, pattern))!]),
+        queryLeads(leadFilters({ q, meId: user.id }), 30),
       ])
-    : [[], []];
+    : [[], [], []];
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
       <PageHeader title="Search" />
       <form className="mb-8">
-        <input className="input text-base" name="q" defaultValue={q} placeholder="Search docs and tasks…" autoFocus />
+        <input className="input text-base" name="q" defaultValue={q} placeholder="Search docs, tasks and leads…" autoFocus />
       </form>
       {q && (
         <>
@@ -56,6 +59,8 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           </div>
           <h2 className="mb-2 text-sm font-medium text-stone-700">Tasks ({taskHits.length})</h2>
           <TaskList tasks={taskHits.slice(0, 50)} showProject empty="No matching tasks." />
+          <h2 className="mb-2 mt-8 text-sm font-medium text-stone-700">Leads ({leadHits.length})</h2>
+          <LeadList leads={leadHits} empty="No matching leads." />
         </>
       )}
     </div>

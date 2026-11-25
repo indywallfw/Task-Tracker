@@ -15,6 +15,13 @@
       "when": 1795515041787,
       "tag": "0001_api_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795545006188,
+      "tag": "0002_leads",
+      "breakpoints": true
     }
   ]
 }

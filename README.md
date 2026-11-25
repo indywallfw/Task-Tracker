@@ -4,8 +4,9 @@ In-house task tracker and docs wiki, built to replace Notion. It includes:
 
 - **Projects & tasks**: kanban board and list views, assignees, due dates, priorities, comments, and per-project numbering (`OPS-12`).
 - **Docs**: nested pages with a rich-text editor (headings, checklists, tables, links), autosave and search.
+- **Leads (CRM)**: a pipeline board from New to Won/Lost, with contact details, product interest, source, owner, next follow-up date, an activity log, and follow-up tasks. Your follow-ups due this week show on My work.
 - **People & roles**: admins add teammates, set roles and switch off access. There is no public sign-up.
-- **Notion import**: upload a Notion "Markdown & CSV" export. Pages keep their structure, and databases with a Status column become projects.
+- **Notion import**: upload a Notion "Markdown & CSV" export. Pages keep their structure, and databases with a Status column become projects. Add your teammates under People first, so task owners can be matched by name.
 - **Claude connector**: an MCP server at `/api/mcp`, so Claude can search, create and update tasks, comments and docs as you.
 
 Stack: Next.js 16, React 19, PostgreSQL 17, Drizzle ORM, Tiptap editor, Tailwind CSS 4.
@@ -64,13 +65,13 @@ Each person creates a personal token under **Account → Connect Claude**. The t
   }
   ```
 
-Tools: `whoami`, `list_projects`, `list_people`, `search_tasks`, `get_task`, `create_task`, `update_task`, `add_comment`, `list_docs`, `search_docs`, `get_doc`, `create_doc`, `update_doc`.
+Tools: `whoami`, `list_projects`, `list_people`, `search_tasks`, `get_task`, `create_task`, `update_task`, `add_comment`, `list_docs`, `search_docs`, `get_doc`, `create_doc`, `update_doc`, `search_leads`, `get_lead`, `create_lead`, `update_lead`, `log_lead_activity`.
 
 Adding it as a custom connector in claude.ai (web and mobile) needs the app on a public HTTPS address plus OAuth sign-in, which isn't built yet.
 
 ## Roadmap ideas
 
-- Client leads / CRM pipeline, with leads linked to tasks and docs
+- Lead import from CSV, deal values and pipeline reports
 - OAuth for the claude.ai connector, and single sign-on (Google or Microsoft)
 - Email or Slack notifications for assignments and due dates
 - File attachments and images in docs

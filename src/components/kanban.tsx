@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { moveTask } from "@/actions/tasks";
 import type { TaskCard } from "@/lib/tasks-query";
+import { positionBetween } from "@/lib/position";
 import { Avatar } from "./avatar";
 import { DueDate, PriorityText } from "./task-bits";
 
@@ -28,16 +29,7 @@ export function Kanban({ tasks, statuses }: { tasks: TaskCard[]; statuses: Statu
     if (!id) return;
     const column = items.filter((t) => t.status === status && t.id !== id).sort((a, b) => a.position - b.position);
     const idx = beforeId ? column.findIndex((t) => t.id === beforeId) : column.length;
-    const prev = column[idx - 1]?.position;
-    const next = column[idx]?.position;
-    const position =
-      prev === undefined && next === undefined
-        ? 1000
-        : prev === undefined
-          ? next! - 1000
-          : next === undefined
-            ? prev + 1000
-            : (prev + next) / 2;
+    const position = positionBetween(column[idx - 1]?.position, column[idx]?.position);
     setItems((all) => all.map((t) => (t.id === id ? { ...t, status, position } : t)));
     startTransition(() => moveTask(id, status, position));
   }

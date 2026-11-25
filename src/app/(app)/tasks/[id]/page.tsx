@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { comments, db, docs, projects, tasks, users } from "@/db";
+import { comments, db, docs, leads, projects, tasks, users } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getActiveUsers } from "@/lib/data";
 import { PRIORITIES, STATUSES } from "@/lib/constants";
@@ -49,6 +49,9 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       .orderBy(asc(comments.createdAt)),
     db.select({ id: docs.id, title: docs.title }).from(docs).orderBy(asc(docs.title)),
   ]);
+  const [lead] = task.leadId
+    ? await db.select({ id: leads.id, company: leads.company }).from(leads).where(eq(leads.id, task.leadId))
+    : [];
   const linkedDoc = docList.find((d) => d.id === task.linkedDocId);
 
   return (
@@ -59,6 +62,14 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
             {project.name}
           </Link>{" "}
           / <span className="font-mono">{project.key}-{task.number}</span>
+          {lead && (
+            <>
+              {" · for lead "}
+              <Link href={`/leads/${lead.id}`} className="text-blue-700 hover:underline">
+                {lead.company}
+              </Link>
+            </>
+          )}
         </nav>
 
         <form action={updateTask} key={task.title}>

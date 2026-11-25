@@ -2,9 +2,11 @@ import "server-only";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { and, asc, desc, eq, ilike, isNull, ne, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { comments, db, docs, projects, tasks, users } from "@/db";
+import { comments, db, docs, leadActivities, leads, projects, tasks, users } from "@/db";
+import type { LeadStage } from "@/db/schema";
 import type { CurrentUser } from "./auth";
-import { STATUSES, PRIORITIES } from "./constants";
+import { ACTIVITY_KINDS, LEAD_PRODUCTS, LEAD_SOURCES, LEAD_STAGES, STATUSES, PRIORITIES } from "./constants";
+import { insertLead, leadFilters, logActivity, patchLead, queryLeads, type LeadCard, type LeadPatch } from "./leads";
 import { getDocTree, type DocNode } from "./data";
 import { insertTask, patchTask, type TaskPatch } from "./task-service";
 import { queryTasks, type TaskCard } from "./tasks-query";
@@ -17,6 +19,10 @@ import { htmlToText, markdownToHtml } from "./text";
 
 const statusEnum = z.enum(STATUSES.map((s) => s.value) as [string, ...string[]]);
 const priorityEnum = z.enum(PRIORITIES.map((p) => p.value) as [string, ...string[]]);
+const stageEnum = z.enum(LEAD_STAGES.map((s) => s.value) as [string, ...string[]]);
+const productEnum = z.enum(LEAD_PRODUCTS.map((p) => p.value) as [string, ...string[]]);
+const sourceEnum = z.enum(LEAD_SOURCES.map((s) => s.value) as [string, ...string[]]);
+const kindEnum = z.enum(ACTIVITY_KINDS.map((k) => k.value) as [string, ...string[]]);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,6 +42,40 @@ function taskSummary(t: TaskCard) {
     assignee: t.assigneeName,
     dueDate: t.dueDate,
   };
+}
+
+function leadSummary(l: LeadCard) {
+  return {
+    id: l.id,
+    company: l.company,
+    contact: l.contactName,
+    stage: l.stage,
+    products: l.products,
+    source: l.source,
+    owner: l.ownerName,
+    nextFollowUp: l.nextFollowUp,
+    updatedAt: l.updatedAt,
+  };
+}
+
+/** A lead id, or a company name that matches exactly one lead. */
+async function findLead(ref: string): Promise<{ id: string } | { error: string }> {
+  const v = ref.trim();
+  if (uuidRe.test(v)) {
+    const [l] = await db.select({ id: leads.id }).from(leads).where(eq(leads.id, v));
+    return l ?? { error: `No lead ${v}.` };
+  }
+  const exact = await db
+    .select({ id: leads.id })
+    .from(leads)
+    .where(ilike(leads.company, v.replace(/[%_]/g, "\\$&")));
+  if (exact.length === 1) return exact[0];
+  const matches = exact.length
+    ? exact
+    : await db.select({ id: leads.id }).from(leads).where(ilike(leads.company, like(v))).limit(6);
+  if (matches.length === 1) return matches[0];
+  if (!matches.length) return { error: `No lead matches "${v}". Use search_leads.` };
+  return { error: `"${v}" matches several leads; pass the lead id from search_leads.` };
 }
 
 async function findTask(ref: string) {
@@ -87,7 +127,9 @@ export function buildMcpServer(me: CurrentUser) {
     { name: "workspace", version: "1.0.0" },
     {
       instructions:
-        "This is the team's internal workspace: projects with tasks (referenced like OPS-12) and a wiki of docs. " +
+        "This is the team's internal workspace: projects with tasks (referenced like OPS-12), a wiki of docs, " +
+        "and a CRM of client leads (stages new, contacted, qualified, proposal, negotiation, won, lost). " +
+        "After a call or email with a lead, log it with log_lead_activity and set the next follow-up date. " +
         "Use search tools before creating things to avoid duplicates. Dates are YYYY-MM-DD. " +
         "Write task descriptions, comments and docs in Markdown.",
     },
@@ -208,10 +250,17 @@ export function buildMcpServer(me: CurrentUser) {
         status: statusEnum.optional(),
         priority: priorityEnum.optional(),
         dueDate: isoDate.optional(),
+        lead: z.string().optional().describe("Lead id or company name, to make this a follow-up task for that lead"),
       },
     },
     async (a) => {
       const p = await findProject(a.project);
+      let leadId: string | null = null;
+      if (a.lead) {
+        const l = await findLead(a.lead);
+        if ("error" in l) return fail(l.error);
+        leadId = l.id;
+      }
       if (!p) return fail(`No project matches "${a.project}". Use list_projects.`);
       let assigneeId: string | null = null;
       if (a.assignee) {
@@ -226,6 +275,7 @@ export function buildMcpServer(me: CurrentUser) {
         priority: a.priority as never,
         assigneeId,
         dueDate: a.dueDate ?? null,
+        leadId,
         creatorId: me.id,
       });
       return json({ ref: t.ref, id: t.id, url: `/tasks/${t.id}` });
@@ -385,6 +435,180 @@ export function buildMcpServer(me: CurrentUser) {
       }
       await db.update(docs).set(set).where(eq(docs.id, a.id));
       return text(`Updated "${a.title ?? d.title}".`);
+    },
+  );
+
+  // ---------- leads (CRM) ----------
+
+  server.registerTool(
+    "search_leads",
+    {
+      title: "Search leads",
+      description:
+        "Finds client leads. All filters are optional. Won and lost leads are excluded unless a stage is given or includeClosed is true. " +
+        "owner accepts 'me', 'none', an email or a name.",
+      inputSchema: {
+        query: z.string().optional().describe("Text to match in company, contact, email or notes"),
+        stage: stageEnum.optional(),
+        owner: z.string().optional(),
+        product: productEnum.optional(),
+        followUpBefore: isoDate.optional().describe("Only leads whose next follow-up is on or before this date"),
+        includeClosed: z.boolean().optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async (a) => {
+      let owner: string | undefined;
+      if (a.owner) {
+        if (a.owner === "me" || a.owner === "none") owner = a.owner;
+        else {
+          const uid = await findPerson(a.owner, me);
+          if (!uid) return fail(`No teammate matches "${a.owner}". Use list_people.`);
+          owner = uid;
+        }
+      }
+      let rows = await queryLeads(
+        leadFilters({ q: a.query, stage: a.stage, owner, product: a.product, openOnly: !a.includeClosed, meId: me.id }),
+      );
+      if (a.followUpBefore) rows = rows.filter((l) => l.nextFollowUp && l.nextFollowUp <= a.followUpBefore!);
+      return json(rows.slice(0, a.limit ?? 50).map(leadSummary));
+    },
+  );
+
+  server.registerTool(
+    "get_lead",
+    {
+      title: "Get lead",
+      description: "Full details of one lead: contact info, notes, activity log and follow-up tasks.",
+      inputSchema: { lead: z.string().describe("Lead id or company name") },
+      annotations: { readOnlyHint: true },
+    },
+    async (a) => {
+      const found = await findLead(a.lead);
+      if ("error" in found) return fail(found.error);
+      const [card] = await queryLeads([eq(leads.id, found.id)]);
+      const [full] = await db.select().from(leads).where(eq(leads.id, found.id));
+      const log = await db
+        .select({ kind: leadActivities.kind, body: leadActivities.body, author: users.name, at: leadActivities.createdAt })
+        .from(leadActivities)
+        .leftJoin(users, eq(users.id, leadActivities.authorId))
+        .where(eq(leadActivities.leadId, found.id))
+        .orderBy(desc(leadActivities.createdAt))
+        .limit(50);
+      const followUps = await queryTasks([eq(tasks.leadId, found.id)]);
+      return json({
+        ...leadSummary(card),
+        email: full.email,
+        phone: full.phone,
+        website: full.website,
+        notes: full.notes,
+        createdAt: full.createdAt,
+        closedAt: full.closedAt,
+        url: `/leads/${full.id}`,
+        activity: log,
+        tasks: followUps.map(taskSummary),
+      });
+    },
+  );
+
+  server.registerTool(
+    "create_lead",
+    {
+      title: "Create lead",
+      description: "Adds a client lead. Search first so you don't create a duplicate. Owner defaults to you.",
+      inputSchema: {
+        company: z.string().min(1).max(200),
+        contactName: z.string().max(200).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().max(60).optional(),
+        website: z.string().max(300).optional(),
+        stage: stageEnum.optional(),
+        products: z.array(productEnum).optional(),
+        source: sourceEnum.optional(),
+        owner: z.string().optional().describe("'me', 'none', an email or a name"),
+        nextFollowUp: isoDate.optional(),
+        notes: z.string().max(20000).optional(),
+      },
+    },
+    async (a) => {
+      let ownerId: string | null = me.id;
+      if (a.owner === "none") ownerId = null;
+      else if (a.owner) {
+        ownerId = await findPerson(a.owner, me);
+        if (!ownerId) return fail(`No teammate matches "${a.owner}". Use list_people.`);
+      }
+      const l = await insertLead({ ...a, stage: a.stage as LeadStage | undefined, ownerId }, me.id);
+      return json({ id: l.id, company: l.company, url: `/leads/${l.id}` });
+    },
+  );
+
+  server.registerTool(
+    "update_lead",
+    {
+      title: "Update lead",
+      description:
+        "Changes a lead's fields. Only the fields you pass change; products replaces the whole list. " +
+        "Pass owner or nextFollowUp as an empty string to clear it. Stage changes are logged automatically.",
+      inputSchema: {
+        lead: z.string().describe("Lead id or company name"),
+        company: z.string().min(1).max(200).optional(),
+        contactName: z.string().max(200).optional(),
+        email: z.union([z.string().email(), z.literal("")]).optional(),
+        phone: z.string().max(60).optional(),
+        website: z.string().max(300).optional(),
+        stage: stageEnum.optional(),
+        products: z.array(productEnum).optional(),
+        source: z.union([sourceEnum, z.literal("")]).optional(),
+        owner: z.string().optional(),
+        nextFollowUp: z.union([isoDate, z.literal("")]).optional(),
+        notes: z.string().max(20000).optional().describe("Replaces the notes field"),
+      },
+      annotations: { idempotentHint: true },
+    },
+    async (a) => {
+      const found = await findLead(a.lead);
+      if ("error" in found) return fail(found.error);
+      const patch: LeadPatch = {};
+      for (const k of ["company", "contactName", "email", "phone", "website", "notes", "source"] as const) {
+        if (a[k] !== undefined) patch[k] = a[k];
+      }
+      if (a.stage) patch.stage = a.stage as LeadStage;
+      if (a.products) patch.products = a.products;
+      if (a.nextFollowUp !== undefined) patch.nextFollowUp = a.nextFollowUp || null;
+      if (a.owner !== undefined) {
+        if (a.owner === "" || a.owner === "none") patch.ownerId = null;
+        else {
+          const uid = await findPerson(a.owner, me);
+          if (!uid) return fail(`No teammate matches "${a.owner}". Use list_people.`);
+          patch.ownerId = uid;
+        }
+      }
+      await patchLead(found.id, patch, me.id);
+      const [card] = await queryLeads([eq(leads.id, found.id)]);
+      return json(leadSummary(card));
+    },
+  );
+
+  server.registerTool(
+    "log_lead_activity",
+    {
+      title: "Log lead activity",
+      description:
+        "Records a call, email, meeting or note on a lead's activity log, optionally setting the next follow-up date.",
+      inputSchema: {
+        lead: z.string().describe("Lead id or company name"),
+        kind: kindEnum.optional().describe("Default: note"),
+        body: z.string().min(1).max(10000),
+        nextFollowUp: isoDate.optional(),
+      },
+    },
+    async (a) => {
+      const found = await findLead(a.lead);
+      if ("error" in found) return fail(found.error);
+      await logActivity(found.id, me.id, a.kind ?? "note", a.body);
+      if (a.nextFollowUp) await patchLead(found.id, { nextFollowUp: a.nextFollowUp }, me.id);
+      return text(`Logged on the lead${a.nextFollowUp ? `; next follow-up ${a.nextFollowUp}` : ""}.`);
     },
   );
 

@@ -3,6 +3,8 @@ import { desc, eq, ne } from "drizzle-orm";
 import { db, docs, tasks, users } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { queryTasks } from "@/lib/tasks-query";
+import { leadFilters, queryLeads } from "@/lib/leads";
+import { LeadList } from "@/components/lead-list";
 import { todayISO } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
 import { TaskList } from "@/components/task-list";
@@ -11,7 +13,7 @@ export const metadata = { title: "My work" };
 
 export default async function HomePage() {
   const user = await requireUser();
-  const [mine, recentDocs] = await Promise.all([
+  const [mine, recentDocs, myLeads] = await Promise.all([
     queryTasks([eq(tasks.assigneeId, user.id), ne(tasks.status, "done")]),
     db
       .select({ id: docs.id, title: docs.title, icon: docs.icon, updatedAt: docs.updatedAt, by: users.name })
@@ -19,6 +21,7 @@ export default async function HomePage() {
       .leftJoin(users, eq(users.id, docs.updatedById))
       .orderBy(desc(docs.updatedAt))
       .limit(8),
+    queryLeads(leadFilters({ owner: "me", openOnly: true, meId: user.id })),
   ]);
 
   const today = todayISO();
@@ -26,6 +29,9 @@ export default async function HomePage() {
   const overdue = mine.filter((t) => t.dueDate && t.dueDate < today);
   const soon = mine.filter((t) => t.dueDate && t.dueDate >= today && t.dueDate <= weekAhead);
   const later = mine.filter((t) => !t.dueDate || t.dueDate > weekAhead);
+  const followUps = myLeads
+    .filter((l) => l.nextFollowUp && l.nextFollowUp <= weekAhead)
+    .sort((a, b) => a.nextFollowUp!.localeCompare(b.nextFollowUp!));
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
@@ -42,6 +48,11 @@ export default async function HomePage() {
       <Section title="Due in the next 7 days">
         <TaskList tasks={soon} showProject empty="Nothing due this week." />
       </Section>
+      {followUps.length > 0 && (
+        <Section title="Lead follow-ups this week">
+          <LeadList leads={followUps} />
+        </Section>
+      )}
       <Section title="Later / no due date">
         <TaskList tasks={later} showProject empty="Nothing else assigned to you." />
       </Section>

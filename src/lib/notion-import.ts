@@ -66,9 +66,10 @@ const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function mapStatus(v: string | undefined): TaskStatus {
-  const s = (v ?? "").toLowerCase();
+  const s = (v ?? "").toLowerCase().trim();
+  if (/^(not started|to ?do|ready|open|new|blocked)/.test(s)) return "todo";
   if (/(done|complete|closed|shipped|finished)/.test(s)) return "done";
-  if (/review|qa|testing/.test(s)) return "in_review";
+  if (/review|qa|testing|gate check|verify/.test(s)) return "in_review";
   if (/progress|doing|started|active|wip/.test(s)) return "in_progress";
   if (/backlog|later|someday|idea/.test(s)) return "backlog";
   return "todo";
@@ -139,9 +140,14 @@ export async function importNotionExport(
   const summary: ImportSummary = { docs: 0, projects: 0, tasks: 0, skippedFiles: 0, warnings: [] };
   const files = await readZip(zipData);
   const mdFiles = files.filter((f) => f.path.toLowerCase().endsWith(".md"));
-  const csvFiles = files.filter(
-    (f) => f.path.toLowerCase().endsWith(".csv") && !/_all\.csv$/i.test(f.path),
+  // Notion writes "<db>.csv" (the current view, possibly filtered) and "<db>_all.csv"
+  // (every row). Prefer _all, and treat it as if it had the plain name.
+  const allCsv = new Set(
+    files.filter((f) => /_all\.csv$/i.test(f.path)).map((f) => f.path.replace(/_all\.csv$/i, ".csv").toLowerCase()),
   );
+  const csvFiles = files
+    .filter((f) => f.path.toLowerCase().endsWith(".csv") && !allCsv.has(f.path.toLowerCase()))
+    .map((f) => ({ ...f, path: f.path.replace(/_all\.csv$/i, ".csv") }));
   summary.skippedFiles = files.length - mdFiles.length - files.filter((f) => f.path.toLowerCase().endsWith(".csv")).length;
   const decoder = new TextDecoder("utf-8");
 
@@ -290,12 +296,14 @@ export async function importNotionExport(
     if (dbFolders.get(folder)?.kind !== "tasks") continue;
     const name = cleanName(folder.split("/").pop()!);
     const h = c.headers;
-    const titleCol = findCol(h, [/^name$/i, /^title$/i, /^task/i]) ?? h[0];
+    const titleCol = findCol(h, [/^name$/i, /^title$/i, /^task$/i, /^task name$/i]) ?? h[0];
     const statusCol = findCol(h, [/^status$/i, /status/i, /^stage$/i, /^state$/i]);
     const assigneeCol = findCol(h, [/^assign/i, /^owner/i, /^person/i, /^responsible/i]);
     const dueCol = findCol(h, [/^due/i, /deadline/i, /^date$/i]);
     const prioCol = findCol(h, [/priority/i]);
     const used = new Set([titleCol, statusCol, assigneeCol, dueCol, prioCol]);
+    // the original status is worth keeping when it has no direct equivalent here
+    const keepStatus = (v: string) => /blocked|ready|gate/i.test(v);
 
     const [proj] = await db
       .insert(projects)
@@ -315,7 +323,7 @@ export async function importNotionExport(
       if (!title) continue;
       const rowBody = rowPages.get(title.toLowerCase()) ?? "";
       const extra = h
-        .filter((k) => !used.has(k) && (r[k] ?? "").trim())
+        .filter((k) => (!used.has(k) || (k === statusCol && keepStatus(r[k] ?? ""))) && (r[k] ?? "").trim())
         .map((k) => `<li><strong>${escapeHtml(k)}:</strong> ${escapeHtml(r[k])}</li>`)
         .join("");
       const description = (extra ? `<ul>${extra}</ul>` : "") + (rowBody ? toHtml(rowBody, folder + "/x") : "");

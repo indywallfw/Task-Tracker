@@ -84,6 +84,7 @@ export function Sidebar({
       <nav className="flex-1 space-y-5 overflow-y-auto px-2 pb-4">
         <div className="space-y-0.5">
           <NavLink href="/">My work</NavLink>
+          <NavLink href="/leads">Leads</NavLink>
           <NavLink href="/search">Search</NavLink>
         </div>
 

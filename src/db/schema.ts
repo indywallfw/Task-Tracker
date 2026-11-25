@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["admin", "member"]);
@@ -26,6 +27,16 @@ export const priorityEnum = pgEnum("priority", [
   "medium",
   "high",
   "urgent",
+]);
+
+export const leadStageEnum = pgEnum("lead_stage", [
+  "new",
+  "contacted",
+  "qualified",
+  "proposal",
+  "negotiation",
+  "won",
+  "lost",
 ]);
 
 const timestamps = {
@@ -126,13 +137,60 @@ export const tasks = pgTable(
     // ordering inside a kanban column
     position: doublePrecision("position").notNull().default(0),
     linkedDocId: uuid("linked_doc_id").references(() => docs.id, { onDelete: "set null" }),
+    // follow-up tasks created from a lead
+    leadId: uuid("lead_id").references((): AnyPgColumn => leads.id, { onDelete: "set null" }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
     index("tasks_project_idx").on(t.projectId),
     index("tasks_assignee_idx").on(t.assigneeId),
+    index("tasks_lead_idx").on(t.leadId),
   ],
+);
+
+/** Client leads (CRM). */
+export const leads = pgTable(
+  "leads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    company: text("company").notNull(),
+    contactName: text("contact_name").notNull().default(""),
+    email: text("email").notNull().default(""),
+    phone: text("phone").notNull().default(""),
+    website: text("website").notNull().default(""),
+    stage: leadStageEnum("stage").notNull().default("new"),
+    // product keys from LEAD_PRODUCTS in lib/constants
+    products: text("products").array().notNull().default(sql`'{}'::text[]`),
+    // a key from LEAD_SOURCES, or "" when unknown
+    source: text("source").notNull().default(""),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    nextFollowUp: date("next_follow_up"),
+    notes: text("notes").notNull().default(""),
+    // ordering inside a pipeline column
+    position: doublePrecision("position").notNull().default(0),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("leads_owner_idx").on(t.ownerId), index("leads_stage_idx").on(t.stage)],
+);
+
+/** Calls, emails, meetings, notes and stage changes logged against a lead. */
+export const leadActivities = pgTable(
+  "lead_activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    // note | call | email | meeting | stage
+    kind: text("kind").notNull().default("note"),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("lead_activities_lead_idx").on(t.leadId)],
 );
 
 export const comments = pgTable(
@@ -182,6 +240,8 @@ export type User = typeof users.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Doc = typeof docs.$inferSelect;
+export type Lead = typeof leads.$inferSelect;
+export type LeadStage = (typeof leadStageEnum.enumValues)[number];
 export type TaskStatus = (typeof taskStatusEnum.enumValues)[number];
 export type Priority = (typeof priorityEnum.enumValues)[number];
 

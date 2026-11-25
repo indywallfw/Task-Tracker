@@ -13,6 +13,7 @@ export async function insertTask(input: {
   priority?: Priority;
   assigneeId?: string | null;
   dueDate?: string | null;
+  leadId?: string | null;
 }) {
   const status = input.status ?? "todo";
   return db.transaction(async (tx) => {
@@ -37,6 +38,7 @@ export async function insertTask(input: {
         priority: input.priority ?? "none",
         assigneeId: input.assigneeId ?? null,
         dueDate: input.dueDate ?? null,
+        leadId: input.leadId ?? null,
         creatorId: input.creatorId,
         position: (pos?.p ?? 0) + 1000,
         completedAt: status === "done" ? new Date() : null,
