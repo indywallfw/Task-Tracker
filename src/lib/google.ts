@@ -13,8 +13,19 @@ const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.rea
 
 export const googleConfigured = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
-/** APP_URL wins over the request origin, so it works behind a reverse proxy. */
-export const redirectUri = (origin: string) => `${(process.env.APP_URL || origin).replace(/\/$/, "")}/api/google/callback`;
+/**
+ * The address people reach the app at. In a container, route handlers see the
+ * bind address (e.g. http://0.0.0.0:8080) as the request URL, so prefer APP_URL,
+ * then the forwarded / Host headers the proxy (Cloud Run, nginx) passes on.
+ */
+export function publicOrigin(headers: Headers) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  const host = headers.get("x-forwarded-host") ?? headers.get("host") ?? "localhost:3000";
+  const proto = headers.get("x-forwarded-proto")?.split(",")[0].trim() ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+export const redirectUri = (headers: Headers) => `${publicOrigin(headers)}/api/google/callback`;
 
 export function authUrl(state: string, redirect: string) {
   const q = new URLSearchParams({
