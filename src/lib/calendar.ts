@@ -71,7 +71,9 @@ export async function getCalendarItems(
           error:
             code === "invalid_grant"
               ? "Google Calendar access was revoked or expired. Reconnect it below."
-              : "Couldn't load Google Calendar events just now.",
+              : code === "403" && /scope/i.test(e instanceof Error ? e.message : "")
+                ? "Google didn't give this app calendar access. Disconnect Google below, connect again and tick the calendar box on Google's screen."
+                : "Couldn't load Google Calendar events just now.",
         };
       }
     }),

@@ -42,7 +42,9 @@ export function authUrl(state: string, redirect: string) {
   return `${AUTH_URL}?${q}`;
 }
 
-type TokenResponse = { access_token: string; expires_in: number; refresh_token?: string; id_token?: string };
+type TokenResponse = { access_token: string; expires_in: number; refresh_token?: string; id_token?: string; scope?: string };
+
+const CALENDAR_SCOPE = SCOPES[2];
 
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
   const res = await fetch(TOKEN_URL, {
@@ -73,6 +75,10 @@ export class GoogleError extends Error {
 export async function connectGoogle(userId: string, code: string, redirect: string) {
   const t = await tokenRequest({ code, redirect_uri: redirect, grant_type: "authorization_code" });
   if (!t.refresh_token) throw new GoogleError("no_refresh_token", "Google did not grant offline access");
+  // Google's consent screen lets people untick the calendar box; without it every read fails with 403
+  if (t.scope && !t.scope.split(" ").includes(CALENDAR_SCOPE)) {
+    throw new GoogleError("missing_scope", "Calendar access was not granted");
+  }
   // the id_token comes straight from Google's token endpoint over TLS, so its claims can be read as is
   const claims = t.id_token ? JSON.parse(Buffer.from(t.id_token.split(".")[1], "base64url").toString()) : {};
   const values = {

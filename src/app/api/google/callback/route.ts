@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { connectGoogle, publicOrigin, redirectUri } from "@/lib/google";
+import { GoogleError, connectGoogle, publicOrigin, redirectUri } from "@/lib/google";
 
 const STATE_COOKIE = "g_oauth_state";
 
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
   try {
     await connectGoogle(user.id, code, redirectUri(request.headers));
   } catch (e) {
+    if (e instanceof GoogleError && e.code === "missing_scope") return back("no_calendar");
     console.error("Google Calendar connect failed", e);
     return back("error");
   }

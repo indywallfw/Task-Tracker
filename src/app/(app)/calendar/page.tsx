@@ -24,6 +24,7 @@ const weekStart = (iso: string) => addDays(iso, -((fromISO(iso).getDay() + 6) % 
 const GOOGLE_MESSAGES: Record<string, { text: string; ok?: boolean }> = {
   connected: { text: "Google Calendar connected. Your events now show here.", ok: true },
   denied: { text: "Google Calendar wasn't connected: access was declined." },
+  no_calendar: { text: "Google connected, but calendar access was left unticked. Connect again and tick the calendar box." },
   expired: { text: "That sign-in link expired. Try connecting again." },
   error: { text: "Couldn't connect Google Calendar. Check the server log for details." },
   not_configured: { text: "Google sign-in isn't set up on this server yet (see below)." },
