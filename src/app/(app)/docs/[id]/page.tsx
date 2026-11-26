@@ -43,10 +43,10 @@ export default async function DocPage({ params }: PageProps<"/docs/[id]">) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5 md:px-8 md:py-8">
-      <nav className="mb-6 flex flex-wrap items-center gap-1 text-sm text-stone-500">
+      <nav className="mb-6 flex flex-wrap items-center gap-1 break-words text-sm text-stone-500">
         <Link href="/docs" className="hover:underline">Docs</Link>
         {path.slice(0, -1).map((p) => (
-          <span key={p.id}>
+          <span key={p.id} className="min-w-0">
             {" / "}
             <Link href={`/docs/${p.id}`} className="hover:underline">{p.title || "Untitled"}</Link>
           </span>
@@ -99,10 +99,10 @@ export default async function DocPage({ params }: PageProps<"/docs/[id]">) {
           <input type="hidden" name="parentId" value={id} />
           <button className="btn-secondary">+ Sub-page</button>
         </form>
-        <form action={moveDoc} className="flex items-center gap-2 text-sm text-stone-500">
+        <form action={moveDoc} className="flex min-w-0 items-center gap-2 text-sm text-stone-500">
           <input type="hidden" name="id" value={id} />
           Move under
-          <AutoSubmitSelect className="input w-56 py-1.5" name="parentId" defaultValue={doc.doc.parentId ?? ""}>
+          <AutoSubmitSelect className="input w-full min-w-0 py-1.5 sm:w-56" name="parentId" defaultValue={doc.doc.parentId ?? ""}>
             <option value="">(Top level)</option>
             {allDocs
               .filter((d) => d.id !== id)
