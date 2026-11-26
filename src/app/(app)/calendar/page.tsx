@@ -18,8 +18,8 @@ export const metadata = { title: "Calendar" };
 const HOUR_PX = 44;
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-/** Monday on or before the date. */
-const weekStart = (iso: string) => addDays(iso, -((fromISO(iso).getDay() + 6) % 7));
+/** Sunday on or before the date: weeks run Sunday to Saturday. */
+const weekStart = (iso: string) => addDays(iso, -fromISO(iso).getDay());
 
 const GOOGLE_MESSAGES: Record<string, { text: string; ok?: boolean }> = {
   connected: { text: "Google Calendar connected. Your events now show here.", ok: true },
