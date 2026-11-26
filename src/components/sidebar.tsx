@@ -68,12 +68,17 @@ function DocItem({ node, depth }: { node: DocNode; depth: number }) {
 export function Sidebar({
   user,
   projects,
+  products,
   docTree,
 }: {
   user: CurrentUser;
-  projects: { id: string; name: string; key: string }[];
+  projects: { id: string; name: string; key: string; productId: string | null }[];
+  products: { id: string; name: string }[];
   docTree: DocNode[];
 }) {
+  const productIds = new Set(products.map((p) => p.id));
+  // projects of an archived product are listed with the loose ones so they stay reachable
+  const looseProjects = projects.filter((p) => !p.productId || !productIds.has(p.productId));
   // On phones the sidebar is a drawer behind the ☰ button; on md+ it is always shown.
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -155,12 +160,42 @@ export function Sidebar({
 
         <div>
           <div className="flex items-center justify-between px-2 pb-1">
-            <Link href="/projects" className="label mb-0 hover:text-stone-800">
-              Projects
+            <Link href="/products" className="label mb-0 hover:text-stone-800">
+              Products
             </Link>
           </div>
           <div className="space-y-0.5">
-            {projects.map((p) => (
+            {products.map((prod) => (
+              <div key={prod.id}>
+                <NavLink href={`/products/${prod.id}`}>{prod.name}</NavLink>
+                <div className="ml-3 space-y-0.5 border-l border-stone-200 pl-1">
+                  {projects
+                    .filter((p) => p.productId === prod.id)
+                    .map((p) => (
+                      <NavLink key={p.id} href={`/projects/${p.id}`}>
+                        <span className="mr-1.5 font-mono text-xs text-stone-400">{p.key}</span>
+                        {p.name}
+                      </NavLink>
+                    ))}
+                </div>
+              </div>
+            ))}
+            {products.length === 0 && (
+              <Link href="/products" className="block px-2 py-1 text-sm text-stone-400 hover:text-stone-700">
+                + Create a product
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between px-2 pb-1">
+            <Link href="/projects" className="label mb-0 hover:text-stone-800">
+              {products.length ? "Other projects" : "Projects"}
+            </Link>
+          </div>
+          <div className="space-y-0.5">
+            {looseProjects.map((p) => (
               <NavLink key={p.id} href={`/projects/${p.id}`}>
                 <span className="mr-1.5 font-mono text-xs text-stone-400">{p.key}</span>
                 {p.name}

@@ -28,7 +28,7 @@ export async function getDocTree(): Promise<DocNode[]> {
 
 export async function getActiveProjects() {
   return db
-    .select({ id: projects.id, name: projects.name, key: projects.key })
+    .select({ id: projects.id, name: projects.name, key: projects.key, productId: projects.productId })
     .from(projects)
     .where(eq(projects.archived, false))
     .orderBy(asc(projects.name));

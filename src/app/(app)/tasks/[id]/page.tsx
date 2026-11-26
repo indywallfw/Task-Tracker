@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { comments, db, docs, leads, projects, tasks, users } from "@/db";
+import { comments, db, docs, leads, projects, sprints, tasks, users } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getActiveUsers } from "@/lib/data";
 import { PRIORITIES, STATUSES } from "@/lib/constants";
 import { addComment, deleteComment, deleteTask, updateTask } from "@/actions/tasks";
 import { updateTaskProperty } from "@/actions/task-properties";
+import { setTaskSprint } from "@/actions/products";
 import { ActionForm } from "@/components/action-form";
 import { AutoSubmitInput, AutoSubmitSelect, SubmitOnBlurTextarea } from "@/components/auto-submit";
 import { Avatar } from "@/components/avatar";
@@ -50,6 +51,16 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       .orderBy(asc(comments.createdAt)),
     db.select({ id: docs.id, title: docs.title }).from(docs).orderBy(asc(docs.title)),
   ]);
+  // sprints of the project's product that aren't finished, plus the task's own sprint
+  const sprintList = project.productId
+    ? (
+        await db
+          .select({ id: sprints.id, name: sprints.name, status: sprints.status })
+          .from(sprints)
+          .where(eq(sprints.productId, project.productId))
+          .orderBy(asc(sprints.createdAt))
+      ).filter((s) => s.status !== "completed" || s.id === task.sprintId)
+    : [];
   const [lead] = task.leadId
     ? await db.select({ id: leads.id, company: leads.company }).from(leads).where(eq(leads.id, task.leadId))
     : [];
@@ -151,6 +162,22 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
             </AutoSubmitSelect>
           </form>
         </Property>
+        {project.productId && (
+          <Property label="Sprint">
+            <form action={setTaskSprint}>
+              <input type="hidden" name="taskId" value={task.id} />
+              <AutoSubmitSelect className="input py-1.5" name="sprintId" defaultValue={task.sprintId ?? ""}>
+                <option value="">Backlog (no sprint)</option>
+                {sprintList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.status === "active" ? " (active)" : s.status === "completed" ? " (completed)" : ""}
+                  </option>
+                ))}
+              </AutoSubmitSelect>
+            </form>
+          </Property>
+        )}
         <Property label="Due date">
           <form action={updateTask}>
             <input type="hidden" name="id" value={task.id} />

@@ -1,19 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, type SQL } from "drizzle-orm";
+import { eq, ne, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { db, projects, tasks } from "@/db";
+import { db, products, projects, tasks } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getActiveUsers } from "@/lib/data";
 import { assigneeFilter, queryTasks, titleFilter } from "@/lib/tasks-query";
 import { STATUSES } from "@/lib/constants";
+import { PROJECT_STATUSES } from "@/lib/project-meta";
+import { getActiveProducts } from "@/lib/products";
+import { setProjectProduct, setProjectStatus, updateProjectText } from "@/actions/products";
+import { AutoSubmitSelect, SubmitOnBlurTextarea } from "@/components/auto-submit";
 import { setProjectArchived, updateProject } from "@/actions/tasks";
 import { PageHeader } from "@/components/page-header";
 import { Kanban } from "@/components/kanban";
 import { TaskTable, parseSort } from "@/components/task-table";
 import { QuickAddTask } from "@/components/quick-add-task";
 
-const isId = (v: string) => z.string().uuid().safeParse(v).success;
+const PLAN_HINT = ["Approach, milestones, scope, risks…", "", "1. Discovery", "2. Build", "3. Launch"].join("\n");
+
+const isId =(v: string) => z.string().uuid().safeParse(v).success;
 
 export async function generateMetadata({ params }: PageProps<"/projects/[id]">) {
   const { id } = await params;
@@ -30,15 +36,26 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const [project] = await db.select().from(projects).where(eq(projects.id, id));
   if (!project) notFound();
 
-  const view = sp.view === "list" ? "list" : "board";
+  const view = sp.view === "list" ? "list" : sp.view === "board" ? "board" : "overview";
   const assignee = typeof sp.assignee === "string" ? sp.assignee : undefined;
   const q = typeof sp.q === "string" ? sp.q.trim() : undefined;
   const sort = parseSort(sp.sort, project.fields);
 
-  const where = [eq(tasks.projectId, id), assigneeFilter(assignee, user.id), titleFilter(q)].filter(
-    Boolean,
-  ) as SQL[];
-  const [rows, people] = await Promise.all([queryTasks(where), getActiveUsers()]);
+  const where = [
+    eq(tasks.projectId, id),
+    // the overview lists what is still pending
+    view === "overview" ? ne(tasks.status, "done") : undefined,
+    assigneeFilter(assignee, user.id),
+    titleFilter(q),
+  ].filter(Boolean) as SQL[];
+  const [rows, people, productList, product] = await Promise.all([
+    queryTasks(where),
+    getActiveUsers(),
+    getActiveProducts(),
+    project.productId
+      ? db.select({ id: products.id, name: products.name }).from(products).where(eq(products.id, project.productId)).then((r) => r[0])
+      : undefined,
+  ]);
 
   const link = (patch: Record<string, string | undefined>) => {
     const next = new URLSearchParams();
@@ -49,6 +66,23 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="px-4 py-5 md:px-8 md:py-8">
+      <div className="mb-1 text-xs text-stone-500">
+        {product ? (
+          <>
+            <Link href="/products" className="hover:underline">
+              Products
+            </Link>
+            {" / "}
+            <Link href={`/products/${product.id}`} className="hover:underline">
+              {product.name}
+            </Link>
+          </>
+        ) : (
+          <Link href="/projects" className="hover:underline">
+            Projects
+          </Link>
+        )}
+      </div>
       <PageHeader
         title={
           <span className="flex items-center gap-2">
@@ -56,54 +90,112 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
             {project.name}
           </span>
         }
-        subtitle={project.description || undefined}
         actions={
-          <div className="flex rounded-md border border-stone-300 bg-white p-0.5 text-sm">
-            {(["board", "list"] as const).map((v) => (
-              <Link
-                key={v}
-                href={link({ view: v })}
-                className={`rounded px-3 py-1 capitalize ${view === v ? "bg-stone-900 text-white" : "text-stone-600"}`}
-              >
-                {v}
-              </Link>
-            ))}
-          </div>
+          <>
+            <form action={setProjectStatus}>
+              <input type="hidden" name="projectId" value={project.id} />
+              <AutoSubmitSelect className="input w-36 py-1.5" name="status" defaultValue={project.status} aria-label="Project status">
+                {PROJECT_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </AutoSubmitSelect>
+            </form>
+            <div className="flex rounded-md border border-stone-300 bg-white p-0.5 text-sm">
+              {(["overview", "board", "list"] as const).map((v) => (
+                <Link
+                  key={v}
+                  href={link({ view: v === "overview" ? undefined : v })}
+                  className={`rounded px-3 py-1 capitalize ${view === v ? "bg-stone-900 text-white" : "text-stone-600"}`}
+                >
+                  {v}
+                </Link>
+              ))}
+            </div>
+          </>
         }
       />
 
-      <form className="mb-5 flex flex-wrap items-center gap-2" action={`/projects/${id}`}>
-        <input type="hidden" name="view" value={view} />
-        <input className="input w-56 py-1.5" name="q" defaultValue={q} placeholder="Filter by title…" />
-        <select className="input w-48 py-1.5" name="assignee" defaultValue={assignee ?? ""}>
-          <option value="">Everyone</option>
-          <option value="me">Assigned to me</option>
-          <option value="none">Unassigned</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <button className="btn-secondary py-1.5">Apply</button>
-        {(q || assignee) && (
-          <Link href={link({ q: undefined, assignee: undefined })} className="text-sm text-stone-500 underline">
-            Clear
-          </Link>
-        )}
-      </form>
+      {view === "overview" ? (
+        <div className="space-y-8">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <section>
+              <h2 className="label">Description</h2>
+              <form action={updateProjectText} key={`d${project.updatedAt.getTime()}`}>
+                <input type="hidden" name="projectId" value={project.id} />
+                <SubmitOnBlurTextarea
+                  className="input min-h-40"
+                  name="description"
+                  defaultValue={project.description}
+                  rows={7}
+                  placeholder="What this project is and why it matters. Saves when you click away."
+                />
+              </form>
+            </section>
+            <section>
+              <h2 className="label">Proposed plan</h2>
+              <form action={updateProjectText} key={`p${project.updatedAt.getTime()}`}>
+                <input type="hidden" name="projectId" value={project.id} />
+                <SubmitOnBlurTextarea
+                  className="input min-h-40 font-mono text-sm"
+                  name="plan"
+                  defaultValue={project.plan}
+                  rows={7}
+                  placeholder={PLAN_HINT}
+                />
+              </form>
+            </section>
+          </div>
 
-      <QuickAddTask projectId={id} people={people} />
-
-      {view === "board" ? (
-        <Kanban tasks={rows} statuses={STATUSES.map((s) => ({ value: s.value, label: s.label, dot: s.dot }))} />
+          <section>
+            <div className="mb-2 flex items-baseline justify-between">
+              <h2 className="label mb-0">Pending tasks ({rows.length})</h2>
+              <Link href={link({ view: "board" })} className="text-xs text-stone-500 hover:underline">
+                Board with done tasks →
+              </Link>
+            </div>
+            <QuickAddTask projectId={id} people={people} />
+            {rows.length ? (
+              <TaskTable tasks={rows} fields={project.fields} sort={sort} sortHref={(s) => link({ sort: s })} />
+            ) : (
+              <p className="rounded-lg border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-500">
+                Nothing pending. Add a task above.
+              </p>
+            )}
+          </section>
+        </div>
       ) : (
-        <TaskTable
-          tasks={rows}
-          fields={project.fields}
-          sort={sort}
-          sortHref={(s) => link({ sort: s })}
-        />
+        <>
+          <form className="mb-5 flex flex-wrap items-center gap-2" action={`/projects/${id}`}>
+            <input type="hidden" name="view" value={view} />
+            <input className="input w-56 py-1.5" name="q" defaultValue={q} placeholder="Filter by title…" />
+            <select className="input w-48 py-1.5" name="assignee" defaultValue={assignee ?? ""}>
+              <option value="">Everyone</option>
+              <option value="me">Assigned to me</option>
+              <option value="none">Unassigned</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button className="btn-secondary py-1.5">Apply</button>
+            {(q || assignee) && (
+              <Link href={link({ q: undefined, assignee: undefined })} className="text-sm text-stone-500 underline">
+                Clear
+              </Link>
+            )}
+          </form>
+
+          <QuickAddTask projectId={id} people={people} />
+
+          {view === "board" ? (
+            <Kanban tasks={rows} statuses={STATUSES.map((s) => ({ value: s.value, label: s.label, dot: s.dot }))} />
+          ) : (
+            <TaskTable tasks={rows} fields={project.fields} sort={sort} sortHref={(s) => link({ sort: s })} />
+          )}
+        </>
       )}
 
       <details className="mt-10 max-w-xl">
@@ -113,10 +205,6 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           <div>
             <label className="label" htmlFor="pname">Name</label>
             <input className="input" id="pname" name="name" defaultValue={project.name} required />
-          </div>
-          <div>
-            <label className="label" htmlFor="pdesc">Description</label>
-            <textarea className="input" id="pdesc" name="description" rows={2} defaultValue={project.description} />
           </div>
           <div>
             <label className="label" htmlFor="pfields">Table fields</label>
@@ -132,6 +220,18 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
             </p>
           </div>
           <button className="btn-secondary">Save</button>
+        </form>
+        <form action={setProjectProduct} className="card mt-3 p-4">
+          <input type="hidden" name="projectId" value={project.id} />
+          <label className="label" htmlFor="pproduct">Product</label>
+          <AutoSubmitSelect className="input" id="pproduct" name="productId" defaultValue={project.productId ?? ""}>
+            <option value="">No product</option>
+            {productList.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </AutoSubmitSelect>
         </form>
         {user.role === "admin" && (
           <form action={setProjectArchived} className="mt-3">

@@ -34,6 +34,8 @@ const projectSchema = z.object({
     .toUpperCase()
     .regex(/^[A-Z][A-Z0-9]{1,5}$/, "Key must be 2–6 letters or digits, starting with a letter"),
   description: z.string().trim().max(2000).optional().default(""),
+  productId: optionalUuid,
+  status: z.enum(["planned", "active", "on_hold", "done"]).catch("active"),
 });
 
 export async function createProject(_: FormState, formData: FormData): Promise<FormState> {
@@ -54,8 +56,8 @@ export async function updateProject(formData: FormData) {
   await requireUser();
   const id = z.string().uuid().parse(formData.get("id"));
   const name = z.string().trim().min(1).max(80).parse(formData.get("name"));
-  const description = z.string().trim().max(2000).parse(formData.get("description") ?? "");
-  const patch: { name: string; description: string; fields?: string[] } = { name, description };
+  const patch: { name: string; description?: string; fields?: string[] } = { name };
+  if (formData.has("description")) patch.description = z.string().trim().max(5000).parse(formData.get("description"));
   if (formData.has("fields")) {
     // one field per line; keep order, drop blanks and duplicates
     const lines = String(formData.get("fields")).split(/\r?\n/).map((l) => l.trim().slice(0, 60)).filter(Boolean);

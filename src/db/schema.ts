@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -29,6 +30,9 @@ export const priorityEnum = pgEnum("priority", [
   "high",
   "urgent",
 ]);
+
+export const projectStatusEnum = pgEnum("project_status", ["planned", "active", "on_hold", "done"]);
+export const sprintStatusEnum = pgEnum("sprint_status", ["planned", "active", "completed"]);
 
 export const leadStageEnum = pgEnum("lead_stage", [
   "new",
@@ -89,12 +93,59 @@ export const apiTokens = pgTable(
   (t) => [index("api_tokens_user_idx").on(t.userId)],
 );
 
+/** A product groups projects, the people on it, its sprints and its documents. */
+export const products = pgTable("products", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  archived: boolean("archived").notNull().default(false),
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+export const productMembers = pgTable(
+  "product_members",
+  {
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // free text, e.g. "Product owner", "Developer"
+    role: text("role").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.userId] })],
+);
+
+export const sprints = pgTable(
+  "sprints",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    goal: text("goal").notNull().default(""),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    status: sprintStatusEnum("status").notNull().default("planned"),
+    ...timestamps,
+  },
+  (t) => [index("sprints_product_idx").on(t.productId)],
+);
+
 export const projects = pgTable("projects", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   // short prefix used in task ids, e.g. "OPS" -> OPS-12
   key: text("key").notNull().unique(),
   description: text("description").notNull().default(""),
+  // the proposed plan: approach, milestones, scope
+  plan: text("plan").notNull().default(""),
+  status: projectStatusEnum("status").notNull().default("active"),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
   archived: boolean("archived").notNull().default(false),
   taskCounter: integer("task_counter").notNull().default(0),
   // extra columns shown in the table view, in order (e.g. imported Notion properties)
@@ -115,11 +166,13 @@ export const docs = pgTable(
     // plain-text copy used for search
     contentText: text("content_text").notNull().default(""),
     position: doublePrecision("position").notNull().default(0),
+    // documents like a build plan, linked to a product
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
     updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
-  (t) => [index("docs_parent_idx").on(t.parentId)],
+  (t) => [index("docs_parent_idx").on(t.parentId), index("docs_product_idx").on(t.productId)],
 );
 
 export const tasks = pgTable(
@@ -139,6 +192,7 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     // ordering inside a kanban column
     position: doublePrecision("position").notNull().default(0),
+    sprintId: uuid("sprint_id").references(() => sprints.id, { onDelete: "set null" }),
     linkedDocId: uuid("linked_doc_id").references(() => docs.id, { onDelete: "set null" }),
     // follow-up tasks created from a lead
     leadId: uuid("lead_id").references((): AnyPgColumn => leads.id, { onDelete: "set null" }),
@@ -151,6 +205,7 @@ export const tasks = pgTable(
     index("tasks_project_idx").on(t.projectId),
     index("tasks_assignee_idx").on(t.assigneeId),
     index("tasks_lead_idx").on(t.leadId),
+    index("tasks_sprint_idx").on(t.sprintId),
   ],
 );
 
@@ -330,6 +385,10 @@ export const docsRelations = relations(docs, ({ one }) => ({
 
 export type User = typeof users.$inferSelect;
 export type Project = typeof projects.$inferSelect;
+export type Product = typeof products.$inferSelect;
+export type Sprint = typeof sprints.$inferSelect;
+export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
+export type SprintStatus = (typeof sprintStatusEnum.enumValues)[number];
 export type Task = typeof tasks.$inferSelect;
 export type Doc = typeof docs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;

@@ -36,6 +36,13 @@
       "when": 1795591072125,
       "tag": "0004_todos_calendar",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795721193516,
+      "tag": "0005_products",
+      "breakpoints": true
     }
   ]
 }
