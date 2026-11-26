@@ -144,7 +144,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
 
 function itemStyle(c: string) {
   return c.startsWith("#")
-    ? { className: "border", style: { backgroundColor: `${c}22`, borderColor: `${c}88`, color: "#1c1917" } }
+    ? { className: "border", style: { backgroundColor: `${c}22`, borderColor: `${c}88`, color: "var(--color-stone-900)" } } // stone-900 flips to near-white in dark mode
     : { className: `border ${color(c).soft}`, style: undefined };
 }
 
