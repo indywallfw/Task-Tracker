@@ -35,7 +35,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
   };
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-5 md:px-8 md:py-8">
       <PageHeader
         title="Leads"
         subtitle={`${openCount} open ${openCount === 1 ? "lead" : "leads"} in the pipeline.`}

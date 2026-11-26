@@ -48,7 +48,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   };
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-5 md:px-8 md:py-8">
       <PageHeader
         title={
           <span className="flex items-center gap-2">

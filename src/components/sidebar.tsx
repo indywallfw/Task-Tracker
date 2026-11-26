@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { logout } from "@/actions/auth";
 import { createDoc } from "@/actions/docs";
 import type { CurrentUser } from "@/lib/auth";
@@ -14,7 +14,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   return (
     <Link
       href={href}
-      className={`block truncate rounded-md px-2 py-1.5 text-sm ${
+      className={`block truncate rounded-md px-2 py-2 text-sm md:py-1.5 ${
         active ? "bg-stone-200/70 font-medium text-stone-900" : "text-stone-600 hover:bg-stone-200/50"
       }`}
     >
@@ -43,13 +43,13 @@ function DocItem({ node, depth }: { node: DocNode; depth: number }) {
         >
           {open ? "▾" : "▸"}
         </button>
-        <Link href={`/docs/${node.id}`} className="min-w-0 flex-1 truncate py-1 text-stone-700">
+        <Link href={`/docs/${node.id}`} className="min-w-0 flex-1 truncate py-1.5 text-stone-700 md:py-1">
           {node.icon ? `${node.icon} ` : ""}
           {node.title || "Untitled"}
         </Link>
-        <form action={createDoc} className="hidden group-hover:block">
+        <form action={createDoc} className="md:hidden md:group-hover:block">
           <input type="hidden" name="parentId" value={node.id} />
-          <button className="px-1 text-stone-400 hover:text-stone-800" title="Add sub-page">
+          <button className="px-2 py-1 text-stone-400 hover:text-stone-800 md:px-1 md:py-0" title="Add sub-page">
             +
           </button>
         </form>
@@ -74,14 +74,77 @@ export function Sidebar({
   projects: { id: string; name: string; key: string }[];
   docTree: DocNode[];
 }) {
+  // On phones the sidebar is a drawer behind the ☰ button; on md+ it is always shown.
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   return (
-    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-stone-100/60">
-      <div className="px-4 py-4">
-        <div className="text-sm font-semibold">Workspace</div>
-        <div className="truncate text-xs text-stone-500">{user.name}</div>
+    <>
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-stone-200 bg-stone-100/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex h-11 w-11 items-center justify-center rounded-md text-xl text-stone-700 hover:bg-stone-200/60"
+          aria-label="Open menu"
+          aria-expanded={open}
+          aria-controls="app-sidebar"
+        >
+          ☰
+        </button>
+        <Link href="/" className="flex-1 text-sm font-semibold">
+          Workspace
+        </Link>
+        <Link
+          href="/search"
+          className="flex h-11 w-11 items-center justify-center rounded-md text-stone-600 hover:bg-stone-200/60"
+          aria-label="Search"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden>
+            <circle cx="8.5" cy="8.5" r="5.5" />
+            <path d="m13 13 4 4" strokeLinecap="round" />
+          </svg>
+        </Link>
+      </header>
+
+      {open && (
+        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setOpen(false)} aria-hidden />
+      )}
+
+    <aside
+      id="app-sidebar"
+      className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-stone-200 bg-stone-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-transform duration-200 md:sticky md:top-0 md:z-auto md:h-screen md:w-64 md:max-w-none md:translate-x-0 md:bg-stone-100/60 md:p-0 md:transition-none ${
+        open ? "translate-x-0 shadow-xl" : "-translate-x-full"
+      }`}
+      // close the drawer when a link inside it is followed
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("a")) setOpen(false);
+      }}
+    >
+      <div className="flex items-start justify-between px-4 py-4">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Workspace</div>
+          <div className="truncate text-xs text-stone-500">{user.name}</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="-m-2 flex h-10 w-10 items-center justify-center rounded-md text-lg text-stone-500 hover:bg-stone-200/60 md:hidden"
+          aria-label="Close menu"
+        >
+          ✕
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-2 pb-4">
+      <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-2 pb-4">
         <div className="space-y-0.5">
           <NavLink href="/">My work</NavLink>
           <NavLink href="/todos">To-dos</NavLink>
@@ -117,7 +180,7 @@ export function Sidebar({
               Docs
             </Link>
             <form action={createDoc}>
-              <button className="text-stone-400 hover:text-stone-800" title="New page">
+              <button className="px-1 text-stone-400 hover:text-stone-800" title="New page">
                 +
               </button>
             </form>
@@ -129,25 +192,19 @@ export function Sidebar({
           </ul>
         </div>
 
-        {user.role === "admin" && (
-          <div>
-            <div className="label px-2">Admin</div>
-            <div className="space-y-0.5">
-              <NavLink href="/admin/users">People</NavLink>
-              <NavLink href="/admin/import">Import from Notion</NavLink>
-            </div>
-          </div>
-        )}
       </nav>
 
-      <div className="flex items-center justify-between border-t border-stone-200 px-4 py-3">
-        <Link href="/account" className="text-sm text-stone-600 hover:text-stone-900">
-          Account
-        </Link>
+      <div className="flex items-center justify-between gap-2 border-t border-stone-200 px-2 py-2">
+        <div className="flex-1">
+          <NavLink href="/settings">⚙ Settings</NavLink>
+        </div>
         <form action={logout}>
-          <button className="text-sm text-stone-500 hover:text-stone-900">Sign out</button>
+          <button className="rounded-md px-2 py-2 text-sm text-stone-500 hover:bg-stone-200/50 hover:text-stone-900 md:py-1.5">
+            Sign out
+          </button>
         </form>
       </div>
     </aside>
+    </>
   );
 }

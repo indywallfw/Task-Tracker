@@ -34,7 +34,7 @@ export default async function HomePage() {
     .sort((a, b) => a.nextFollowUp!.localeCompare(b.nextFollowUp!));
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-5 md:px-8 md:py-8">
       <PageHeader
         title={`Hi, ${user.name.split(" ")[0]}`}
         subtitle={`${mine.length} open ${mine.length === 1 ? "task is" : "tasks are"} assigned to you.`}

@@ -27,7 +27,7 @@ export async function createUser(_: FormState, formData: FormData): Promise<Form
     role: parsed.data.role,
     passwordHash: await hashPassword(parsed.data.password),
   });
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/people");
   return { ok: `Added ${parsed.data.name}. Share the temporary password with them privately.` };
 }
 
@@ -41,7 +41,7 @@ export async function updateUser(formData: FormData) {
   }
   await db.update(users).set({ role, active }).where(eq(users.id, id));
   if (!active) await db.delete(sessions).where(eq(sessions.userId, id));
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/people");
 }
 
 export async function resetPassword(_: FormState, formData: FormData): Promise<FormState> {

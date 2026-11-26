@@ -104,6 +104,7 @@ export async function disconnectGoogle() {
   const user = await requireUser();
   await disconnectGoogleAccount(user.id);
   revalidatePath("/calendar");
+  revalidatePath("/settings/integrations");
 }
 
 /** Saves which Google calendars to show. */
@@ -116,4 +117,5 @@ export async function chooseGoogleCalendars(formData: FormData) {
     .set({ calendarIds: picked.slice(0, 20) })
     .where(eq(googleAccounts.userId, user.id));
   revalidatePath("/calendar");
+  revalidatePath("/settings/integrations");
 }

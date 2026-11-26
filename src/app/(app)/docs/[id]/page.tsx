@@ -42,7 +42,7 @@ export default async function DocPage({ params }: PageProps<"/docs/[id]">) {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-5 md:px-8 md:py-8">
       <nav className="mb-6 flex flex-wrap items-center gap-1 text-sm text-stone-500">
         <Link href="/docs" className="hover:underline">Docs</Link>
         {path.slice(0, -1).map((p) => (

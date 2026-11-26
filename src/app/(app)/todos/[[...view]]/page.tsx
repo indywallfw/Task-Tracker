@@ -14,6 +14,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { TaskList } from "@/components/task-list";
 import { TodoGroup, TodoNavLink } from "@/components/todo-item";
 import { TodoQuickAdd } from "@/components/todo-quick-add";
+import { MobileToggle } from "@/components/mobile-toggle";
 
 type View =
   | { kind: "today" }
@@ -202,8 +203,12 @@ export default async function TodosPage({ params }: PageProps<"/todos/[[...view]
   }
 
   return (
-    <div className="flex min-h-screen">
-      <nav className="w-56 shrink-0 space-y-5 border-r border-stone-200 px-3 py-8" aria-label="To-do views">
+    <div className="md:flex md:min-h-screen">
+      <nav
+        className="border-b border-stone-200 px-2 py-1 md:w-56 md:shrink-0 md:border-r md:border-b-0 md:px-3 md:py-8"
+        aria-label="To-do views"
+      >
+        <MobileToggle label="Views and lists" className="space-y-5 pb-3 md:pb-0">
         <div className="space-y-0.5">
           <TodoNavLink href="/todos/inbox" active={view.kind === "inbox"} count={counts.get("inbox")}>
             📥 Inbox
@@ -250,9 +255,10 @@ export default async function TodosPage({ params }: PageProps<"/todos/[[...view]
             </div>
           </div>
         )}
+        </MobileToggle>
       </nav>
 
-      <div className="min-w-0 flex-1 px-8 py-8">
+      <div className="min-w-0 flex-1 px-4 py-5 md:px-8 md:py-8">
         <div className="mx-auto max-w-3xl">
           <div className="mb-5">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

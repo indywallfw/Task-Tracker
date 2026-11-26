@@ -56,7 +56,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const linkedDoc = docList.find((d) => d.id === task.linkedDocId);
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-10 px-8 py-8">
+    <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-5 md:px-8 md:py-8 lg:flex-row lg:gap-10">
       <div className="min-w-0 flex-1">
         <nav className="mb-3 text-sm text-stone-500">
           <Link href={`/projects/${project.id}`} className="hover:underline">
@@ -119,7 +119,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
       </div>
 
       {/* keyed on updatedAt so the fields remount with fresh values after each save */}
-      <aside key={task.updatedAt.getTime()} className="w-64 shrink-0 space-y-5 pt-8">
+      <aside key={task.updatedAt.getTime()} className="w-full space-y-5 border-t border-stone-200 pt-6 lg:w-64 lg:shrink-0 lg:border-0 lg:pt-8">
         <Property label="Status">
           <form action={updateTask}>
             <input type="hidden" name="id" value={task.id} />

@@ -26,7 +26,7 @@ export default async function DocsPage() {
   await requireUser();
   const tree = await getDocTree();
   return (
-    <div className="mx-auto max-w-3xl px-8 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-5 md:px-8 md:py-8">
       <PageHeader
         title="Docs"
         subtitle="Company knowledge, processes and client context. Pages can nest as deep as you like."
@@ -42,7 +42,7 @@ export default async function DocsPage() {
         </div>
       ) : (
         <p className="text-sm text-stone-500">
-          No pages yet. Create one, or <Link href="/admin/import" className="underline">import from Notion</Link>.
+          No pages yet. Create one, or <Link href="/settings/import" className="underline">import from Notion</Link>.
         </p>
       )}
     </div>

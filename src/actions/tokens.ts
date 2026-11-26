@@ -14,7 +14,7 @@ export async function createToken(_: TokenState, formData: FormData): Promise<To
   const name = String(formData.get("name") ?? "").trim().slice(0, 80);
   if (!name) return { error: "Give the token a name, e.g. “Claude on my laptop”." };
   const token = await issueToken(user.id, name);
-  revalidatePath("/account");
+  revalidatePath("/settings/integrations");
   return { token };
 }
 
@@ -22,5 +22,5 @@ export async function revokeToken(formData: FormData) {
   const user = await requireUser();
   const id = z.string().uuid().parse(formData.get("id"));
   await db.delete(apiTokens).where(and(eq(apiTokens.id, id), eq(apiTokens.userId, user.id)));
-  revalidatePath("/account");
+  revalidatePath("/settings/integrations");
 }

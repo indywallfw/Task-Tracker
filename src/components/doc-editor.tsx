@@ -36,7 +36,7 @@ export function DocEditor({
           placeholder="🙂"
           maxLength={4}
           aria-label="Page icon (emoji)"
-          className="w-12 rounded-md bg-transparent text-center text-3xl outline-none placeholder:opacity-30 hover:bg-stone-100"
+          className="w-10 shrink-0 rounded-md bg-transparent text-center text-2xl md:w-12 md:text-3xl outline-none placeholder:opacity-30 hover:bg-stone-100"
         />
         <input
           value={t}
@@ -46,7 +46,7 @@ export function DocEditor({
           }}
           placeholder="Untitled"
           aria-label="Page title"
-          className="min-w-0 flex-1 bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-stone-300"
+          className="min-w-0 flex-1 bg-transparent text-2xl font-semibold md:text-3xl tracking-tight outline-none placeholder:text-stone-300"
         />
       </div>
       <RichEditor initialHtml={html} onSave={(h, text) => saveDocContent(id, h, text)} />

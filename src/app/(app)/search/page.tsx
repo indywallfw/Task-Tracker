@@ -37,7 +37,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
     : [[], [], []];
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-5 md:px-8 md:py-8">
       <PageHeader title="Search" />
       <form className="mb-8">
         <input className="input text-base" name="q" defaultValue={q} placeholder="Search docs, tasks and leads…" autoFocus />

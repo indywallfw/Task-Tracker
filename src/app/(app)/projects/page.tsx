@@ -25,7 +25,7 @@ export default async function ProjectsPage() {
     .orderBy(asc(projects.archived), asc(projects.name));
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-5 md:px-8 md:py-8">
       <PageHeader title="Projects" subtitle="Each project has its own board and task numbering." />
 
       <div className="mb-8 grid gap-3 sm:grid-cols-2">
