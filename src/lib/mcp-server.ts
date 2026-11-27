@@ -1,6 +1,6 @@
 import "server-only";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { and, asc, desc, eq, ilike, isNull, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { comments, db, docs, leadActivities, leads, projects, tasks, users } from "@/db";
 import type { LeadStage } from "@/db/schema";
@@ -460,6 +460,36 @@ export function buildMcpServer(me: CurrentUser) {
   // ---------- leads (CRM) ----------
 
   server.registerTool(
+    "delete_doc",
+    {
+      title: "Delete doc",
+      description:
+        "Permanently deletes a doc page and every page nested under it. This can't be undone. Get the id from list_docs or search_docs.",
+      inputSchema: { id: z.string().uuid() },
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    async ({ id }) => {
+      const all = await db.select({ id: docs.id, parentId: docs.parentId, title: docs.title }).from(docs);
+      const doc = all.find((d) => d.id === id);
+      if (!doc) return fail(`No doc ${id}.`);
+      // the page and everything nested under it, like the app's Delete page button
+      const gone = new Set([id]);
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const d of all) {
+          if (d.parentId && gone.has(d.parentId) && !gone.has(d.id)) {
+            gone.add(d.id);
+            grew = true;
+          }
+        }
+      }
+      await db.delete(docs).where(inArray(docs.id, [...gone]));
+      const sub = gone.size - 1;
+      return text(`Deleted “${doc.title || "Untitled"}”${sub ? ` and ${sub} sub-page${sub === 1 ? "" : "s"}` : ""}.`);
+    },
+  );
+
+  server.registerTool(
     "search_leads",
     {
       title: "Search leads",
@@ -606,6 +636,23 @@ export function buildMcpServer(me: CurrentUser) {
       await patchLead(found.id, patch, me.id);
       const [card] = await queryLeads([eq(leads.id, found.id)]);
       return json(leadSummary(card));
+    },
+  );
+
+  server.registerTool(
+    "delete_lead",
+    {
+      title: "Delete lead",
+      description:
+        "Permanently deletes a lead and its activity log. Follow-up tasks are kept but unlinked. This can't be undone; to close a lead instead, set its stage to lost or won with update_lead.",
+      inputSchema: { lead: z.string().describe("Lead id or company name") },
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    async ({ lead }) => {
+      const found = await findLead(lead);
+      if ("error" in found) return fail(found.error);
+      const [l] = await db.delete(leads).where(eq(leads.id, found.id)).returning({ company: leads.company });
+      return text(`Deleted lead “${l?.company ?? lead}”.`);
     },
   );
 
