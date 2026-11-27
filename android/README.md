@@ -7,6 +7,11 @@ the app to change its name, icon, package id or version.
 
 Built with [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) from `twa-manifest.json`.
 
+Runs on **Android 15 (API 35, 2024) and newer**; targets and compiles against Android 16 (API 36).
+Toolchain: JDK 17, Android Gradle Plugin 8.9.1, Gradle 8.11.1, packages from Google and Maven Central.
+`bubblewrap update` regenerates `build.gradle` files: afterwards switch any `jcenter()` back to
+`mavenCentral()` and Java `VERSION_1_8` to `VERSION_17`.
+
 ## One-time setup
 
 1. Tools: JDK 17 and the Android SDK command-line tools (Bubblewrap can download both).

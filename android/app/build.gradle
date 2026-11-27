@@ -55,10 +55,10 @@ android {
     namespace "com.indypendance.app"
     defaultConfig {
         applicationId "com.indypendance.app"
-        minSdkVersion 24
+        minSdkVersion 35
         targetSdkVersion 36
         versionCode 1
-        versionName ""
+        versionName "1.0.0"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -156,8 +156,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     lintOptions {
         checkReleaseBuilds false

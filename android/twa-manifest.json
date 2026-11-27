@@ -21,21 +21,33 @@
     "path": "./indypendance-upload.keystore",
     "alias": "upload"
   },
-  "appVersionName": "1.0.0",
   "appVersionCode": 1,
   "shortcuts": [
-    { "name": "To-dos", "shortName": "To-dos", "url": "/todos/today", "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon" },
-    { "name": "My work", "shortName": "My work", "url": "/", "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon" }
+    {
+      "name": "To-dos",
+      "shortName": "To-dos",
+      "url": "/todos/today",
+      "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon"
+    },
+    {
+      "name": "My work",
+      "shortName": "My work",
+      "url": "/",
+      "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon"
+    }
   ],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://workspace-1029942545777.asia-southeast1.run.app/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
-  "alphaDependencies": { "enabled": false },
+  "alphaDependencies": {
+    "enabled": false
+  },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://workspace-1029942545777.asia-southeast1.run.app/",
-  "minSdkVersion": 24,
-  "orientationLock": false
+  "minSdkVersion": 35,
+  "orientationLock": false,
+  "appVersion": "1.0.0"
 }
