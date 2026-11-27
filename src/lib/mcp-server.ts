@@ -324,6 +324,24 @@ export function buildMcpServer(me: CurrentUser) {
   );
 
   server.registerTool(
+    "delete_task",
+    {
+      title: "Delete task",
+      description:
+        "Permanently deletes a task with its comments. This can't be undone; to just close a task, set its status to done with update_task instead.",
+      inputSchema: { ref: z.string().describe("Task reference (e.g. OPS-12) or id") },
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    async ({ ref }) => {
+      const id = await findTask(ref);
+      if (!id) return fail(`No task ${ref}.`);
+      const [t] = await queryTasks([eq(tasks.id, id)]);
+      await db.delete(tasks).where(eq(tasks.id, id));
+      return text(`Deleted ${t ? `${t.projectKey}-${t.number} “${t.title}”` : ref}.`);
+    },
+  );
+
+  server.registerTool(
     "add_comment",
     {
       title: "Comment on task",
