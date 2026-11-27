@@ -67,6 +67,8 @@ export async function addTodo(_: FormState, formData: FormData): Promise<FormSta
     priority: p.priority,
     labels: p.labels,
     recurrence: p.recurrence,
+    // a to-do with a time reminds you at that time unless you change it
+    reminders: p.dueTime ? [0] : [],
     position: (pos?.p ?? 0) + 1000,
   });
   refresh();
@@ -99,7 +101,10 @@ const updateSchema = z.object({
 export async function updateTodo(formData: FormData) {
   const user = await requireUser();
   const d = updateSchema.parse(Object.fromEntries(formData));
-  await ownTodo(d.id, user.id);
+  const before = await ownTodo(d.id, user.id);
+  const reminderField = String(formData.get("reminder") ?? "");
+  // giving a to-do a time for the first time turns on "at the time", like a new to-do
+  const timeJustAdded = !before.dueTime && !!d.dueTime && !before.reminders.length && reminderField === "";
   await db
     .update(todos)
     .set({
@@ -111,7 +116,9 @@ export async function updateTodo(formData: FormData) {
       recurrence: d.dueDate ? d.recurrence : null,
       priority: d.priority,
       // a reminder needs a date; "moreReminders" carries extra ones from TickTick through unchanged
-      reminders: d.dueDate && String(formData.get("reminder") ?? "") !== ""
+      reminders: timeJustAdded
+        ? [0]
+        : d.dueDate && reminderField !== ""
         ? [
             ...new Set(
               [String(formData.get("reminder") ?? ""), ...String(formData.get("moreReminders") ?? "").split(",")]

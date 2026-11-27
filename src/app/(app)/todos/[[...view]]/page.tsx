@@ -14,6 +14,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { TaskList } from "@/components/task-list";
 import { TodoGroup, TodoNavLink } from "@/components/todo-item";
 import { TodoQuickAdd } from "@/components/todo-quick-add";
+import { NotifyPrompt } from "@/components/notify-prompt";
 import { MobileToggle } from "@/components/mobile-toggle";
 
 type View =
@@ -264,6 +265,7 @@ export default async function TodosPage({ params }: PageProps<"/todos/[[...view]
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             {subtitle && <p className="mt-1 text-sm text-stone-500">{subtitle}</p>}
           </div>
+          <NotifyPrompt />
           {body}
         </div>
       </div>
