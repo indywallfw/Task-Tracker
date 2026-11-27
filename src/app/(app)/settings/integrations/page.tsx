@@ -38,7 +38,7 @@ export default async function IntegrationsPage() {
       <section className="card p-5">
         <h2 className="mb-1 font-medium">Claude</h2>
         <p className="mb-4 text-sm text-stone-500">
-          Use Workspace from Claude anywhere: claude.ai, the desktop and mobile apps, and Claude Code. Each person connects
+          Use IndypenDance from Claude anywhere: claude.ai, the desktop and mobile apps, and Claude Code. Each person connects
           their own Claude account and signs in as themselves, so Claude only sees what they can see.
         </p>
         <div className="label">Connector URL</div>
@@ -48,13 +48,13 @@ export default async function IntegrationsPage() {
             In Claude (web or desktop), open <span className="font-medium">Settings → Connectors</span> and choose{" "}
             <span className="font-medium">Add custom connector</span>.
           </li>
-          <li>Name it “Workspace”, paste the URL above, and click Add. Leave the advanced OAuth fields empty.</li>
+          <li>Name it “IndypenDance”, paste the URL above, and click Add. Leave the advanced OAuth fields empty.</li>
           <li>Click Connect, sign in here if asked, then click Allow. It then works on Claude for iPhone and Android too.</li>
         </ol>
         <p className="mt-3 text-xs text-stone-500">
           On a Claude Team or Enterprise plan, an owner adds the connector once for the organisation; each person then just
           clicks Connect. In Claude Code, run{" "}
-          <code className="break-all rounded bg-stone-100 px-1 font-mono">claude mcp add --transport http workspace {mcpUrl}</code>{" "}
+          <code className="break-all rounded bg-stone-100 px-1 font-mono">claude mcp add --transport http indypendance {mcpUrl}</code>{" "}
           and then <code className="rounded bg-stone-100 px-1 font-mono">/mcp</code> to sign in.
         </p>
 

@@ -106,7 +106,7 @@ export function Sidebar({
           ☰
         </button>
         <Link href="/" className="flex-1 text-sm font-semibold">
-          Workspace
+          IndypenDance
         </Link>
         <Link
           href="/search"
@@ -136,7 +136,7 @@ export function Sidebar({
     >
       <div className="flex items-start justify-between px-4 py-4">
         <div className="min-w-0">
-          <div className="text-sm font-semibold">Workspace</div>
+          <div className="text-sm font-semibold">IndypenDance</div>
           <div className="truncate text-xs text-stone-500">{user.name}</div>
         </div>
         <button

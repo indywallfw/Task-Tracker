@@ -3,10 +3,10 @@ import { getTheme, THEME_COLORS } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Workspace", template: "%s · Workspace" },
+  title: { default: "IndypenDance", template: "%s · IndypenDance" },
   description: "Tasks, docs and team context in one place",
-  applicationName: "Workspace",
-  appleWebApp: { capable: true, title: "Workspace", statusBarStyle: "black-translucent" },
+  applicationName: "IndypenDance",
+  appleWebApp: { capable: true, title: "IndypenDance", statusBarStyle: "black-translucent" },
 };
 
 export async function generateViewport(): Promise<Viewport> {

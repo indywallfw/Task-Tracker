@@ -124,10 +124,10 @@ function outline(nodes: DocNode[], depth = 0): string {
 
 export function buildMcpServer(me: CurrentUser) {
   const server = new McpServer(
-    { name: "workspace", version: "1.0.0" },
+    { name: "indypendance", title: "IndypenDance", version: "1.0.0" },
     {
       instructions:
-        "This is the team's internal workspace: projects with tasks (referenced like OPS-12), a wiki of docs, " +
+        "This is IndypenDance, the team's internal workspace: projects with tasks (referenced like OPS-12), a wiki of docs, " +
         "and a CRM of client leads (stages new, contacted, qualified, proposal, negotiation, won, lost). " +
         "After a call or email with a lead, log it with log_lead_activity and set the next follow-up date. " +
         "Use search tools before creating things to avoid duplicates. Dates are YYYY-MM-DD. " +

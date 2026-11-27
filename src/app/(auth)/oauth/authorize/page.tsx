@@ -19,7 +19,7 @@ function Problem({ text }: { text: string }) {
 }
 
 /**
- * OAuth consent screen. Claude sends people here when they add the Workspace
+ * OAuth consent screen. Claude sends people here when they add the IndypenDance
  * connector; they sign in (if needed) and choose Allow or Cancel.
  */
 export default async function AuthorizePage({ searchParams }: { searchParams: Promise<Params> }) {

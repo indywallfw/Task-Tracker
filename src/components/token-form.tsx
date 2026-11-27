@@ -7,7 +7,7 @@ export function TokenForm({ mcpUrl }: { mcpUrl: string }) {
   const [state, action, pending] = useActionState(createToken, undefined);
   const [copied, setCopied] = useState(false);
   const command = state?.token
-    ? `claude mcp add --transport http workspace ${mcpUrl} --header "Authorization: Bearer ${state.token}"`
+    ? `claude mcp add --transport http indypendance ${mcpUrl} --header "Authorization: Bearer ${state.token}"`
     : "";
 
   return (

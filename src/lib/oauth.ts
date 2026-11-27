@@ -7,7 +7,7 @@ import { publicOrigin } from "./google";
 
 // OAuth 2.1 authorization server for remote MCP clients such as Claude
 // (claude.ai, Claude desktop and mobile, Claude Code). Each person signs in
-// with their own Workspace account and Claude then acts as them.
+// with their own IndypenDance account and Claude then acts as them.
 //
 // Supports dynamic client registration (RFC 7591), client ID metadata documents
 // (an https URL as client_id), PKCE S256 only, and rotating refresh tokens.
@@ -45,7 +45,7 @@ export function protectedResourceMetadata(h: Headers) {
     authorization_servers: [iss],
     scopes_supported: [SCOPE],
     bearer_methods_supported: ["header"],
-    resource_name: "Workspace",
+    resource_name: "IndypenDance",
   };
 }
 

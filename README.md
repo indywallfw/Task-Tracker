@@ -1,4 +1,4 @@
-# Workspace
+# IndypenDance
 
 In-house task tracker and docs wiki, built to replace Notion. It includes:
 
@@ -70,13 +70,13 @@ Each person creates a personal token under **Account → Connect Claude**. The t
 
 - **Claude Code:** run the command shown after creating the token:
   ```
-  claude mcp add --transport http workspace https://work.yourcompany.com/api/mcp --header "Authorization: Bearer tt_..."
+  claude mcp add --transport http indypendance https://work.yourcompany.com/api/mcp --header "Authorization: Bearer tt_..."
   ```
 - **Claude Desktop:** add this to `claude_desktop_config.json` (uses the `mcp-remote` bridge):
   ```json
   {
     "mcpServers": {
-      "workspace": {
+      "indypendance": {
         "command": "npx",
         "args": ["-y", "mcp-remote", "https://work.yourcompany.com/api/mcp", "--header", "Authorization: Bearer tt_..."]
       }
