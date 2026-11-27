@@ -7,12 +7,8 @@ export default async function SettingsLayout({ children }: { children: React.Rea
     { href: "/settings", label: "Display" },
     { href: "/settings/account", label: "Account" },
     { href: "/settings/integrations", label: "Integrations" },
-    ...(user.role === "admin"
-      ? [
-          { href: "/settings/people", label: "People" },
-          { href: "/settings/import", label: "Import" },
-        ]
-      : []),
+    { href: "/settings/import", label: "Import" },
+    ...(user.role === "admin" ? [{ href: "/settings/people", label: "People" }] : []),
   ];
   return (
     <div className="mx-auto max-w-3xl px-4 py-5 md:px-8 md:py-8">

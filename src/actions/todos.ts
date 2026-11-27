@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/constants";
 import { isRecurrence, nextOccurrence } from "@/lib/recurrence";
 import { parseQuickAdd } from "@/lib/todo-parse";
+import { taskFollowsTodo } from "@/lib/sprint-todos";
 import { COLOR_KEYS } from "@/lib/todo-meta";
 import type { FormState } from "./auth";
 
@@ -109,6 +110,17 @@ export async function updateTodo(formData: FormData) {
       dueTime: d.dueDate ? d.dueTime : null,
       recurrence: d.dueDate ? d.recurrence : null,
       priority: d.priority,
+      // a reminder needs a date; "moreReminders" carries extra ones from TickTick through unchanged
+      reminders: d.dueDate && String(formData.get("reminder") ?? "") !== ""
+        ? [
+            ...new Set(
+              [String(formData.get("reminder") ?? ""), ...String(formData.get("moreReminders") ?? "").split(",")]
+                .filter((v) => v.trim() !== "")
+                .map(Number)
+                .filter((n) => Number.isInteger(n) && Math.abs(n) <= 40320),
+            ),
+          ]
+        : [],
       listId: await ownList(d.listId, user.id),
       labels: [
         ...new Set(
@@ -142,6 +154,13 @@ export async function toggleTodo(formData: FormData) {
       .update(todos)
       .set({ completedAt: t.completedAt ? null : new Date() })
       .where(eq(todos.id, t.id));
+    // a sprint to-do carries its task with it
+    const taskId = await taskFollowsTodo(t.id);
+    if (taskId) {
+      revalidatePath(`/tasks/${taskId}`);
+      revalidatePath("/products", "layout");
+      revalidatePath("/projects", "layout");
+    }
   }
   refresh();
 }

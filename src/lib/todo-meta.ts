@@ -50,3 +50,24 @@ export function relativeDay(iso: string, today: string) {
     ...(y !== ty ? { year: "numeric" } : {}),
   });
 }
+
+/** Reminder choices, in minutes before the due time (negative: that many minutes into an all-day date). */
+export const REMINDER_CHOICES = [
+  { value: 0, label: "At the time" },
+  { value: 5, label: "5 min before" },
+  { value: 15, label: "15 min before" },
+  { value: 30, label: "30 min before" },
+  { value: 60, label: "1 hour before" },
+  { value: 1440, label: "1 day before" },
+  { value: -540, label: "9 AM on the day" },
+] as const;
+
+/** 15 → "15 min before", -540 → "9:00 AM on the day". */
+export function reminderLabel(m: number) {
+  const known = REMINDER_CHOICES.find((c) => c.value === m);
+  if (known) return known.label;
+  if (m < 0) return `${formatTime(`${String(Math.floor(-m / 60) % 24).padStart(2, "0")}:${String(-m % 60).padStart(2, "0")}`)} on the day`;
+  if (m % 1440 === 0) return `${m / 1440} days before`;
+  if (m % 60 === 0) return `${m / 60} hours before`;
+  return `${m} min before`;
+}

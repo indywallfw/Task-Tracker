@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { syncTaskTodos } from "@/lib/sprint-todos";
 import { eq } from "drizzle-orm";
 import { comments, db, projects, tasks } from "@/db";
 import type { Priority, TaskStatus } from "@/db/schema";
@@ -132,6 +133,8 @@ export async function updateTask(formData: FormData) {
     patch.completedAt = d.status === "done" ? new Date() : null;
   }
   const [t] = await db.update(tasks).set(patch).where(eq(tasks.id, d.id)).returning({ projectId: tasks.projectId });
+  await syncTaskTodos([d.id]);
+  revalidatePath("/todos", "layout");
   revalidatePath(`/tasks/${d.id}`);
   if (t) revalidatePath(`/projects/${t.projectId}`);
   revalidatePath("/");
@@ -158,6 +161,8 @@ export async function moveTask(id: string, status: string, position: number) {
     })
     .where(eq(tasks.id, id))
     .returning({ projectId: tasks.projectId });
+  await syncTaskTodos([id]);
+  revalidatePath("/todos", "layout");
   if (t) revalidatePath(`/projects/${t.projectId}`);
   revalidatePath("/");
 }

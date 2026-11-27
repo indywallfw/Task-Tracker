@@ -602,6 +602,12 @@ function SprintDetail({
       {sprint.status === "active" && (
         <p className="text-xs text-stone-500">Completing the sprint sends its unfinished tasks back to the backlog.</p>
       )}
+      {sprint.status !== "completed" && (
+        <p className="text-xs text-stone-500">
+          Tasks with an owner show up in that person&apos;s To-dos, due on the task&apos;s date or the sprint&apos;s last day.
+          Ticking one off there marks the task done.
+        </p>
+      )}
 
       {sprint.status !== "completed" && projectOptions.length > 0 && (
         <details className="card p-4" open={sprintTasks.length === 0}>

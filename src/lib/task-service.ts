@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, max, sql } from "drizzle-orm";
 import { db, projects, tasks } from "@/db";
 import type { Priority, TaskStatus } from "@/db/schema";
+import { syncTaskTodos } from "./sprint-todos";
 
 /** Creates a task with the next per-project number. Shared by the UI and the MCP connector. */
 export async function insertTask(input: {
@@ -66,5 +67,6 @@ export async function patchTask(id: string, patch: TaskPatch) {
   const set: Record<string, unknown> = { ...patch };
   if (patch.status) set.completedAt = patch.status === "done" ? new Date() : null;
   const [t] = await db.update(tasks).set(set).where(eq(tasks.id, id)).returning();
+  await syncTaskTodos([id]);
   return t;
 }

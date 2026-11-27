@@ -11,6 +11,7 @@ import { getDocTree, type DocNode } from "./data";
 import { insertTask, patchTask, type TaskPatch } from "./task-service";
 import { queryTasks, type TaskCard } from "./tasks-query";
 import { htmlToText, markdownToHtml } from "./text";
+import { importTickTick, type TickTickData } from "./ticktick-import";
 
 /**
  * MCP server exposing the workspace to Claude. Every call runs as the user who
@@ -675,6 +676,29 @@ export function buildMcpServer(me: CurrentUser) {
       await logActivity(found.id, me.id, a.kind ?? "note", a.body);
       if (a.nextFollowUp) await patchLead(found.id, { nextFollowUp: a.nextFollowUp }, me.id);
       return text(`Logged on the lead${a.nextFollowUp ? `; next follow-up ${a.nextFollowUp}` : ""}.`);
+    },
+  );
+
+  server.registerTool(
+    "import_ticktick",
+    {
+      title: "Import TickTick tasks into To-dos",
+      description:
+        "Copies TickTick tasks into your personal To-dos. Pass tasks exactly as the TickTick connector returns them " +
+        "(include completed ones if wanted) and the TickTick projects (lists) they belong to. Lists, colours, dates, times, " +
+        "priority, tags, notes, checklist items, sub-tasks, repeats, reminders and done status come across. Safe to run " +
+        "again: items are matched by their TickTick id and updated, never duplicated.",
+      inputSchema: {
+        projects: z
+          .array(z.object({ id: z.string(), name: z.string(), color: z.string().nullish(), sortOrder: z.number().nullish() }).passthrough())
+          .optional()
+          .describe("TickTick projects (lists); tasks in the inbox need none"),
+        tasks: z.array(z.object({ id: z.string(), title: z.string() }).passthrough()).min(1).max(2000),
+      },
+    },
+    async (a) => {
+      const summary = await importTickTick(me.id, { projects: a.projects ?? [], tasks: a.tasks } as unknown as TickTickData);
+      return json(summary);
     },
   );
 

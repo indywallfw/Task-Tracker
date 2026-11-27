@@ -9,6 +9,7 @@ import { requireAdmin, requireUser } from "@/lib/auth";
 import { PROJECT_STATUSES, SPRINT_STATUSES } from "@/lib/project-meta";
 import { PRODUCT_TEMPLATES, seedProductTemplates } from "@/lib/product-templates";
 import { insertTask } from "@/lib/task-service";
+import { syncSprintTodos, syncTaskTodos } from "@/lib/sprint-todos";
 import type { FormState } from "./auth";
 
 const id = z.uuid();
@@ -25,6 +26,8 @@ const optionalDate = z
 
 const refresh = (productId?: string | null) => {
   revalidatePath("/", "layout");
+  // sprint tasks are mirrored in people's To-dos
+  revalidatePath("/todos", "layout");
   if (productId) revalidatePath(`/products/${productId}`);
 };
 
@@ -208,6 +211,7 @@ export async function updateSprint(formData: FormData) {
   const sprintId = id.parse(formData.get("sprintId"));
   const d = sprintSchema.parse(Object.fromEntries(formData));
   const [s] = await db.update(sprints).set(d).where(eq(sprints.id, sprintId)).returning({ productId: sprints.productId });
+  await syncSprintTodos(sprintId);
   refresh(s?.productId);
 }
 
@@ -220,16 +224,20 @@ export async function setSprintStatus(formData: FormData) {
   const sprintId = id.parse(formData.get("sprintId"));
   const status = z.enum(SPRINT_STATUSES.map((s) => s.value)).parse(formData.get("status"));
   const [s] = await db.update(sprints).set({ status }).where(eq(sprints.id, sprintId)).returning({ productId: sprints.productId });
+  const inSprint = (await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.sprintId, sprintId))).map((r) => r.id);
   if (status === "completed") {
     await db.update(tasks).set({ sprintId: null }).where(and(eq(tasks.sprintId, sprintId), ne(tasks.status, "done")));
   }
+  await syncTaskTodos(inSprint);
   refresh(s?.productId);
 }
 
 export async function deleteSprint(formData: FormData) {
   await requireUser();
   const sprintId = id.parse(formData.get("sprintId"));
+  const inSprint = (await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.sprintId, sprintId))).map((r) => r.id);
   const [s] = await db.delete(sprints).where(eq(sprints.id, sprintId)).returning({ productId: sprints.productId });
+  await syncTaskTodos(inSprint);
   refresh(s?.productId);
   redirect(`/products/${s?.productId}?tab=sprints`);
 }
@@ -246,6 +254,7 @@ export async function addTasksToSprint(formData: FormData) {
     .update(tasks)
     .set({ sprintId })
     .where(and(inArray(tasks.id, taskIds), inArray(tasks.projectId, own)));
+  await syncTaskTodos(taskIds);
   refresh(s.productId);
 }
 
@@ -265,6 +274,7 @@ export async function setTaskSprint(formData: FormData) {
     if (!s || s.productId !== t.productId) throw new Error("That sprint belongs to another product.");
   }
   await db.update(tasks).set({ sprintId }).where(eq(tasks.id, taskId));
+  await syncTaskTodos([taskId]);
   refresh(t.productId);
   revalidatePath(`/tasks/${taskId}`);
   revalidatePath(`/projects/${t.projectId}`);
@@ -297,18 +307,34 @@ export async function createSprintTask(_: FormState, formData: FormData): Promis
   if (!s || !p || p.productId !== s.productId) return { error: "That project isn't part of this product." };
 
   const task = await insertTask({ projectId: projectId.data, title, creatorId: user.id, assigneeId, dueDate, sprintId });
+  // the owner gets the task in their To-dos automatically
+  await syncTaskTodos([task.id]);
   if (remind) {
-    const [pos] = await db.select({ p: max(todos.position) }).from(todos).where(eq(todos.userId, user.id));
-    await db.insert(todos).values({
-      userId: user.id,
-      title: `${task.ref} ${title}`.slice(0, 300),
-      notes: `Sprint task in ${s.name}`,
-      dueDate: remindDate,
-      dueTime: remindDate ? remindTime : null,
-      taskId: task.id,
-      position: (pos?.p ?? 0) + 1000,
-    });
-    revalidatePath("/todos", "layout");
+    const [own] = await db
+      .select({ id: todos.id })
+      .from(todos)
+      .where(and(eq(todos.taskId, task.id), eq(todos.userId, user.id), eq(todos.source, "sprint")));
+    if (own) {
+      // your own task: the reminder date and time go on that same to-do
+      if (remindDate)
+        await db
+          .update(todos)
+          .set({ dueDate: remindDate, dueTime: remindTime, reminders: remindTime ? [0] : [] })
+          .where(eq(todos.id, own.id));
+    } else {
+      const [pos] = await db.select({ p: max(todos.position) }).from(todos).where(eq(todos.userId, user.id));
+      await db.insert(todos).values({
+        userId: user.id,
+        title: `${task.ref} ${title}`.slice(0, 300),
+        notes: `Sprint task in ${s.name}`,
+        dueDate: remindDate,
+        dueTime: remindDate ? remindTime : null,
+        reminders: remindDate && remindTime ? [0] : [],
+        taskId: task.id,
+        source: "reminder",
+        position: (pos?.p ?? 0) + 1000,
+      });
+    }
   }
   refresh(s.productId);
   revalidatePath(`/projects/${projectId.data}`);

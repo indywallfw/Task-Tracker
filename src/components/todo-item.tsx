@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Todo, TodoList } from "@/db";
 import { deleteTodo, rescheduleTodo, toggleTodo, updateTodo } from "@/actions/todos";
 import { RECURRENCES, recurrenceLabel } from "@/lib/recurrence";
-import { TODO_PRIORITIES, color, formatTime, relativeDay, todoPriority } from "@/lib/todo-meta";
+import { REMINDER_CHOICES, TODO_PRIORITIES, color, formatTime, relativeDay, reminderLabel, todoPriority } from "@/lib/todo-meta";
 import type { TodoRow } from "@/lib/todos";
 import { TodoQuickAdd } from "./todo-quick-add";
 
@@ -63,6 +63,9 @@ export function TodoItem({
             {firstNote && <div className="truncate text-xs text-stone-500">{firstNote}</div>}
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-500">
               <DueChip todo={todo} today={today} />
+              {todo.dueDate && todo.reminders.length > 0 && (
+                <span title={todo.reminders.map(reminderLabel).join(", ")}>⏰ {reminderLabel(todo.reminders[0])}{todo.reminders.length > 1 ? ` +${todo.reminders.length - 1}` : ""}</span>
+              )}
               {todo.taskId && (
                 <Link href={`/tasks/${todo.taskId}`} className="text-sky-700 hover:underline">
                   ↗ Open task
@@ -129,6 +132,19 @@ export function TodoItem({
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="text-xs text-stone-500">
+                Reminder
+                <select className="input mt-0.5 py-1.5" name="reminder" defaultValue={todo.reminders[0] ?? ""}>
+                  <option value="">None</option>
+                  {[...REMINDER_CHOICES.map((c) => c.value), ...todo.reminders.filter((m) => !REMINDER_CHOICES.some((c) => c.value === m))].map((m) => (
+                    <option key={m} value={m}>
+                      {reminderLabel(m)}
+                    </option>
+                  ))}
+                </select>
+                {/* extra reminders from TickTick are kept as they are */}
+                <input type="hidden" name="moreReminders" value={todo.reminders.slice(1).join(",")} />
               </label>
               <label className="col-span-1 text-xs text-stone-500 md:col-span-2">
                 List

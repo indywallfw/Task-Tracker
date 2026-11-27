@@ -346,6 +346,8 @@ export const todoLists = pgTable(
     name: text("name").notNull(),
     // a key from TODO_COLORS
     color: text("color").notNull().default("stone"),
+    // id in the app it was imported from (e.g. a TickTick list)
+    externalId: text("external_id"),
     position: doublePrecision("position").notNull().default(0),
     ...timestamps,
   },
@@ -375,6 +377,12 @@ export const todos = pgTable(
     recurrence: text("recurrence"),
     // a reminder for a tracked task, e.g. added while planning a sprint
     taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+    // where it came from: "sprint" (kept in sync with its sprint task), "reminder", "ticktick", or null if typed here
+    source: text("source"),
+    // id in the app it was imported from, so a re-import updates instead of duplicating
+    externalId: text("external_id"),
+    // minutes before the due time (0 = at the time; negative = after the start of an all-day date)
+    reminders: integer("reminders").array().notNull().default(sql`'{}'::int[]`),
     position: doublePrecision("position").notNull().default(0),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
@@ -383,6 +391,8 @@ export const todos = pgTable(
     index("todos_user_idx").on(t.userId),
     index("todos_list_idx").on(t.listId),
     index("todos_parent_idx").on(t.parentId),
+    index("todos_task_idx").on(t.taskId),
+    index("todos_external_idx").on(t.userId, t.externalId),
   ],
 );
 
