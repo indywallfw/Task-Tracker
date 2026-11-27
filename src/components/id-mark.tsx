@@ -33,3 +33,16 @@ export function IdMark({ size }: { size: number }) {
     </div>
   );
 }
+
+/** The mark as a small rounded tile, for use inside the app (e.g. the sidebar). */
+export function AppMark({ size = 28 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-flex shrink-0 overflow-hidden rounded-md ring-1 ring-stone-300"
+      style={{ width: size, height: size }}
+    >
+      <IdMark size={size} />
+    </span>
+  );
+}

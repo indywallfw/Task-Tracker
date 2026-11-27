@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppMark } from "./id-mark";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/actions/auth";
@@ -108,7 +109,8 @@ export function Sidebar({
         >
           ☰
         </button>
-        <Link href="/" className="flex-1 text-sm font-semibold">
+        <Link href="/" className="flex flex-1 items-center gap-2 text-sm font-semibold">
+          <AppMark size={24} />
           IndypenDance
         </Link>
         <Link
@@ -138,10 +140,13 @@ export function Sidebar({
       }}
     >
       <div className="flex items-start justify-between px-4 py-4">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">IndypenDance</div>
-          <div className="truncate text-xs text-stone-500">{user.name}</div>
-        </div>
+        <Link href="/" className="flex min-w-0 items-center gap-2.5">
+          <AppMark size={32} />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">IndypenDance</span>
+            <span className="block truncate text-xs text-stone-500">{user.name}</span>
+          </span>
+        </Link>
         <button
           type="button"
           onClick={() => setOpen(false)}
