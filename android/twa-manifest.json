@@ -5,35 +5,35 @@
   "launcherName": "IndypenDance",
   "display": "standalone",
   "orientation": "portrait",
-  "themeColor": "#1A1817",
-  "themeColorDark": "#1A1817",
-  "navigationColor": "#1A1817",
-  "navigationColorDark": "#1A1817",
-  "navigationDividerColor": "#1A1817",
-  "navigationDividerColorDark": "#1A1817",
-  "backgroundColor": "#1A1817",
+  "themeColor": "#071738",
+  "themeColorDark": "#071738",
+  "navigationColor": "#071738",
+  "navigationColorDark": "#071738",
+  "navigationDividerColor": "#071738",
+  "navigationDividerColorDark": "#071738",
+  "backgroundColor": "#071738",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon",
-  "maskableIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon",
+  "iconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/brand/icon-512.png",
+  "maskableIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/brand/maskable-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./indypendance-upload.keystore",
     "alias": "upload"
   },
-  "appVersionCode": 1,
+  "appVersionCode": 2,
   "shortcuts": [
     {
       "name": "To-dos",
       "shortName": "To-dos",
       "url": "/todos/today",
-      "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon"
+      "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/brand/icon-192.png"
     },
     {
       "name": "My work",
       "shortName": "My work",
       "url": "/",
-      "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon"
+      "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/brand/icon-192.png"
     }
   ],
   "generatorApp": "bubblewrap-cli",
@@ -49,5 +49,6 @@
   "fullScopeUrl": "https://workspace-1029942545777.asia-southeast1.run.app/",
   "minSdkVersion": 35,
   "orientationLock": false,
-  "appVersion": "1.0.0"
+  "appVersion": "1.1.0",
+  "monochromeIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/brand/mono-192.png"
 }
