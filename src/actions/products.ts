@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db, docs, productMembers, products, projects, sprints, tasks } from "@/db";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { PROJECT_STATUSES, SPRINT_STATUSES } from "@/lib/project-meta";
+import { PRODUCT_TEMPLATES, seedProductTemplates } from "@/lib/product-templates";
 import type { FormState } from "./auth";
 
 const id = z.uuid();
@@ -43,6 +44,9 @@ export async function createProduct(_: FormState, formData: FormData): Promise<F
     .returning({ id: products.id });
   // the creator is on the product team from the start
   await db.insert(productMembers).values({ productId: p.id, userId: user.id, role: "Owner" });
+  // optional starter pieces ticked on the form
+  const chosen = PRODUCT_TEMPLATES.map((t) => t.value).filter((v) => formData.get(`template_${v}`) === "on");
+  if (chosen.length) await seedProductTemplates({ id: p.id, name: parsed.data.name }, user.id, chosen);
   refresh();
   redirect(`/products/${p.id}`);
 }

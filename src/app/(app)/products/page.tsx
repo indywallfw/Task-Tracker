@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getProductCards } from "@/lib/products";
+import { PRODUCT_TEMPLATES } from "@/lib/product-templates";
 import { createProduct, setProductArchived } from "@/actions/products";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
@@ -60,6 +61,20 @@ export default async function ProductsPage() {
             <label className="label" htmlFor="description">Description</label>
             <textarea className="input" id="description" name="description" rows={3} />
           </div>
+          <fieldset>
+            <legend className="label">Set up with</legend>
+            <div className="space-y-2">
+              {PRODUCT_TEMPLATES.map((t) => (
+                <label key={t.value} className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name={`template_${t.value}`} defaultChecked className="mt-0.5" />
+                  <span>
+                    <span className="font-medium">{t.label}</span>
+                    <span className="block text-xs text-stone-500">{t.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </ActionForm>
       </section>
     </div>

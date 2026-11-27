@@ -14,6 +14,7 @@ export async function insertTask(input: {
   assigneeId?: string | null;
   dueDate?: string | null;
   leadId?: string | null;
+  properties?: Record<string, string>;
 }) {
   const status = input.status ?? "todo";
   return db.transaction(async (tx) => {
@@ -39,6 +40,7 @@ export async function insertTask(input: {
         assigneeId: input.assigneeId ?? null,
         dueDate: input.dueDate ?? null,
         leadId: input.leadId ?? null,
+        properties: input.properties ?? {},
         creatorId: input.creatorId,
         position: (pos?.p ?? 0) + 1000,
         completedAt: status === "done" ? new Date() : null,
