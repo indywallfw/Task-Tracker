@@ -10,6 +10,7 @@ import { PROJECT_STATUSES, SPRINT_STATUSES } from "@/lib/project-meta";
 import { PRODUCT_TEMPLATES, seedProductTemplates } from "@/lib/product-templates";
 import { insertTask } from "@/lib/task-service";
 import { syncSprintTodos, syncTaskTodos } from "@/lib/sprint-todos";
+import { notifyAssigned } from "@/lib/task-notify";
 import type { FormState } from "./auth";
 
 const id = z.uuid();
@@ -244,7 +245,7 @@ export async function deleteSprint(formData: FormData) {
 
 /** Adds the ticked tasks to a sprint; only tasks from the sprint's own product are accepted. */
 export async function addTasksToSprint(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const sprintId = id.parse(formData.get("sprintId"));
   const taskIds = z.array(z.uuid()).max(500).parse(formData.getAll("taskId").map(String));
   const [s] = await db.select({ productId: sprints.productId }).from(sprints).where(eq(sprints.id, sprintId));
@@ -255,12 +256,13 @@ export async function addTasksToSprint(formData: FormData) {
     .set({ sprintId })
     .where(and(inArray(tasks.id, taskIds), inArray(tasks.projectId, own)));
   await syncTaskTodos(taskIds);
+  await notifyAssigned(taskIds, user.id, "sprint");
   refresh(s.productId);
 }
 
 /** Puts one task in a sprint, or takes it out when sprintId is empty. */
 export async function setTaskSprint(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const taskId = id.parse(formData.get("taskId"));
   const sprintId = optionalId.parse(formData.get("sprintId") ?? "");
   const [t] = await db
@@ -275,6 +277,7 @@ export async function setTaskSprint(formData: FormData) {
   }
   await db.update(tasks).set({ sprintId }).where(eq(tasks.id, taskId));
   await syncTaskTodos([taskId]);
+  if (sprintId) await notifyAssigned([taskId], user.id, "sprint");
   refresh(t.productId);
   revalidatePath(`/tasks/${taskId}`);
   revalidatePath(`/projects/${t.projectId}`);

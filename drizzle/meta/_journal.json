@@ -71,6 +71,13 @@
       "when": 1795771538874,
       "tag": "0009_ticktick_import",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795774104987,
+      "tag": "0010_notifications",
+      "breakpoints": true
     }
   ]
 }

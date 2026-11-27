@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { syncTaskTodos } from "@/lib/sprint-todos";
+import { notifyAssigned, notifyComment } from "@/lib/task-notify";
 import { eq } from "drizzle-orm";
 import { comments, db, projects, tasks } from "@/db";
 import type { Priority, TaskStatus } from "@/db/schema";
@@ -119,7 +120,7 @@ const updateTaskSchema = z.object({
 
 /** Updates whichever task fields are present in the form. */
 export async function updateTask(formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
   const raw = Object.fromEntries(formData);
   const d = updateTaskSchema.parse(raw);
   const patch: Record<string, unknown> = {};
@@ -132,8 +133,10 @@ export async function updateTask(formData: FormData) {
     patch.status = d.status;
     patch.completedAt = d.status === "done" ? new Date() : null;
   }
+  const [prev] = "assigneeId" in patch ? await db.select({ a: tasks.assigneeId }).from(tasks).where(eq(tasks.id, d.id)) : [];
   const [t] = await db.update(tasks).set(patch).where(eq(tasks.id, d.id)).returning({ projectId: tasks.projectId });
   await syncTaskTodos([d.id]);
+  if (patch.assigneeId && patch.assigneeId !== prev?.a) await notifyAssigned([d.id], user.id, "assigned");
   revalidatePath("/todos", "layout");
   revalidatePath(`/tasks/${d.id}`);
   if (t) revalidatePath(`/projects/${t.projectId}`);
@@ -183,6 +186,7 @@ export async function addComment(_: FormState, formData: FormData): Promise<Form
   const body = String(formData.get("body") ?? "").trim();
   if (!body) return { error: "Write something first." };
   await db.insert(comments).values({ taskId, authorId: user.id, body: body.slice(0, 10000) });
+  await notifyComment(taskId, user.id, body.slice(0, 10000));
   revalidatePath(`/tasks/${taskId}`);
   return { ok: "Comment added." };
 }

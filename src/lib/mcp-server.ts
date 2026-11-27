@@ -12,6 +12,7 @@ import { insertTask, patchTask, type TaskPatch } from "./task-service";
 import { queryTasks, type TaskCard } from "./tasks-query";
 import { htmlToText, markdownToHtml } from "./text";
 import { importTickTick, type TickTickData } from "./ticktick-import";
+import { notifyComment } from "./task-notify";
 
 /**
  * MCP server exposing the workspace to Claude. Every call runs as the user who
@@ -318,7 +319,7 @@ export function buildMcpServer(me: CurrentUser) {
           patch.assigneeId = uid;
         }
       }
-      await patchTask(id, patch);
+      await patchTask(id, patch, me.id);
       const [t] = await queryTasks([eq(tasks.id, id)]);
       return json(taskSummary(t));
     },
@@ -353,6 +354,7 @@ export function buildMcpServer(me: CurrentUser) {
       const id = await findTask(ref);
       if (!id) return fail(`No task ${ref}.`);
       await db.insert(comments).values({ taskId: id, authorId: me.id, body });
+      await notifyComment(id, me.id, body);
       return text(`Comment added to ${ref}.`);
     },
   );

@@ -6,6 +6,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   const tabs = [
     { href: "/settings", label: "Display" },
     { href: "/settings/account", label: "Account" },
+    { href: "/settings/notifications", label: "Notifications" },
     { href: "/settings/integrations", label: "Integrations" },
     { href: "/settings/import", label: "Import" },
     ...(user.role === "admin" ? [{ href: "/settings/people", label: "People" }] : []),

@@ -13,6 +13,7 @@ import {
   timestamp,
   uuid,
   type AnyPgColumn,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["admin", "member"]);
@@ -454,6 +455,43 @@ export type Doc = typeof docs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type LeadStage = (typeof leadStageEnum.enumValues)[number];
 export type TaskStatus = (typeof taskStatusEnum.enumValues)[number];
+/** A browser or the Android app that has said yes to notifications (Web Push). */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    // e.g. "Android app", "Chrome on Windows", to tell devices apart in Settings
+    device: text("device").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("push_endpoint_idx").on(t.endpoint), index("push_user_idx").on(t.userId)],
+);
+
+/** Which notifications a person wants. A missing row means the defaults (all on, summary at 8:00). */
+export const notificationSettings = pgTable("notification_settings", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  reminders: boolean("reminders").notNull().default(true),
+  assigned: boolean("assigned").notNull().default(true),
+  comments: boolean("comments").notNull().default(true),
+  dailySummary: boolean("daily_summary").notNull().default(true),
+  // local hour (0–23) for the "due today" summary
+  summaryHour: integer("summary_hour").notNull().default(8),
+});
+
+/** One row per notification already sent, so the scheduler never sends the same one twice. */
+export const notificationLog = pgTable("notification_log", {
+  key: text("key").primaryKey(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Todo = typeof todos.$inferSelect;
 export type TodoList = typeof todoLists.$inferSelect;
 export type CalendarEvent = typeof events.$inferSelect;
