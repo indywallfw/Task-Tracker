@@ -142,6 +142,8 @@ export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  // sprint planning notes (cadence, how the team plans) as editor HTML, shown on the Sprints tab
+  sprintPlan: text("sprint_plan").notNull().default(""),
   archived: boolean("archived").notNull().default(false),
   createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,
@@ -190,6 +192,8 @@ export const projects = pgTable("projects", {
   plan: text("plan").notNull().default(""),
   status: projectStatusEnum("status").notNull().default("active"),
   productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+  // listed in the product's Sprints section (e.g. Weekly Sprints) rather than with its projects
+  sprintTracker: boolean("sprint_tracker").notNull().default(false),
   archived: boolean("archived").notNull().default(false),
   taskCounter: integer("task_counter").notNull().default(0),
   // extra columns shown in the table view, in order (e.g. imported Notion properties)

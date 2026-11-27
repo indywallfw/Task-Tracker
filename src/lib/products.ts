@@ -54,6 +54,7 @@ export async function getProductProjects(productId: string) {
       description: projects.description,
       status: projects.status,
       archived: projects.archived,
+      sprintTracker: projects.sprintTracker,
       open: sql<number>`count(${tasks.id}) filter (where ${tasks.status} <> 'done')`.mapWith(Number),
       total: count(tasks.id),
     })

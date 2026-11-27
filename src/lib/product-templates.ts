@@ -1,6 +1,6 @@
 import "server-only";
-import { eq, inArray, isNull, max } from "drizzle-orm";
-import { db, docs, projects, sprints } from "@/db";
+import { and, eq, inArray } from "drizzle-orm";
+import { db, products, projects, sprints } from "@/db";
 import { insertTask } from "@/lib/task-service";
 
 /** Starter pieces that can be created together with a new product. */
@@ -8,7 +8,7 @@ export const PRODUCT_TEMPLATES = [
   {
     value: "sprint",
     label: "Sprint planning",
-    hint: "A sprint planning page and Sprint 1 for next week",
+    hint: "Sprint planning notes on the Sprints tab, and Sprint 1 for next week",
   },
   {
     value: "weekly",
@@ -65,13 +65,7 @@ function initials(name: string) {
   return words.length > 1 ? words.map((w) => w[0]).join("") : (words[0] ?? "P").slice(0, 2);
 }
 
-async function nextDocPosition() {
-  const [row] = await db.select({ p: max(docs.position) }).from(docs).where(isNull(docs.parentId));
-  return (row?.p ?? 0) + 1000;
-}
-
-function sprintPlanningDoc(product: string, productId: string, hasWeekly: boolean, hasLaunch: boolean) {
-  const board = `/products/${productId}?tab=sprints`;
+function sprintPlanningDoc(product: string, hasWeekly: boolean, hasLaunch: boolean) {
   const steps = [
     "Each week gets a sprint in the product's Sprints tab, with a goal and dates.",
     "Add new work with \"Add a task to this sprint\" on the sprint board. It goes into the chosen project's task list, and you can tick \"Remind me\" to put a reminder in your To-dos.",
@@ -83,7 +77,6 @@ function sprintPlanningDoc(product: string, productId: string, hasWeekly: boolea
   if (hasLaunch) steps.push("Plan sprint work against the Launch Readiness Pipeline gates.");
   const html = [
     `<p>Weekly sprint planning and tracking for ${escape(product)}.</p>`,
-    `<p><a href="${board}">Open the sprint board →</a></p>`,
     `<h2>Cadence</h2>`,
     `<p>Sprints run weekly, Monday to Friday. Planning happens on Monday morning and the review on Friday afternoon.</p>`,
     `<h2>Team</h2>`,
@@ -95,7 +88,6 @@ function sprintPlanningDoc(product: string, productId: string, hasWeekly: boolea
   ].join("");
   const text = [
     `Weekly sprint planning and tracking for ${product}.`,
-    "Open the sprint board →",
     "Cadence",
     "Sprints run weekly, Monday to Friday. Planning happens on Monday morning and the review on Friday afternoon.",
     "Team",
@@ -153,6 +145,7 @@ export async function seedProductTemplates(
       .insert(projects)
       .values({
         name: "Weekly Sprints",
+        sprintTracker: true,
         key,
         description: "One row per week: the sprint goal, what was planned, what got done, and retro notes.",
         status: "active",
@@ -171,27 +164,22 @@ export async function seedProductTemplates(
   }
 
   if (want.has("sprint")) {
-    const { html, text } = sprintPlanningDoc(product.name, product.id, want.has("weekly"), want.has("launch"));
-    await db.insert(docs).values({
-      title: `${product.name} Sprint Planning`,
-      icon: "🗓️",
-      content: html,
-      contentText: text,
-      productId: product.id,
-      position: await nextDocPosition(),
-      createdById: userId,
-      updatedById: userId,
-    });
+    // the notes live on the product's Sprints tab, not as a separate page
+    const { html } = sprintPlanningDoc(product.name, want.has("weekly"), want.has("launch"));
+    await db
+      .update(products)
+      .set({ sprintPlan: html })
+      .where(and(eq(products.id, product.id), eq(products.sprintPlan, "")));
     // only start the numbering if the product has no sprints yet
     const existing = await db.select({ id: sprints.id }).from(sprints).where(eq(sprints.productId, product.id)).limit(1);
     if (!existing.length)
       await db.insert(sprints).values({
-      productId: product.id,
-      name: "Sprint 1",
-      goal: "",
-      startDate: iso(week.start),
-      endDate: iso(week.end),
-      status: "planned",
-    });
+        productId: product.id,
+        name: "Sprint 1",
+        goal: "",
+        startDate: iso(week.start),
+        endDate: iso(week.end),
+        status: "planned",
+      });
   }
 }

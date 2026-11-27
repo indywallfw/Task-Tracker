@@ -25,10 +25,10 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
-function DocItem({ node, depth }: { node: DocNode; depth: number }) {
+function DocItem({ node, depth, defaultOpen = false }: { node: DocNode; depth: number; defaultOpen?: boolean }) {
   const path = usePathname();
   const active = path === `/docs/${node.id}`;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <li>
       <div
@@ -59,11 +59,22 @@ function DocItem({ node, depth }: { node: DocNode; depth: number }) {
       {open && node.children.length > 0 && (
         <ul>
           {node.children.map((c) => (
-            <DocItem key={c.id} node={c} depth={depth + 1} />
+            <DocItem key={c.id} node={c} depth={depth + 1} defaultOpen={defaultOpen} />
           ))}
         </ul>
       )}
     </li>
+  );
+}
+
+function SubHead({ href, children, action }: { href: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between px-2 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
+      <Link href={href} className="hover:text-stone-700">
+        {children}
+      </Link>
+      {action}
+    </div>
   );
 }
 
@@ -74,7 +85,7 @@ export function Sidebar({
   docTree,
 }: {
   user: CurrentUser;
-  projects: { id: string; name: string; key: string; productId: string | null }[];
+  projects: { id: string; name: string; key: string; productId: string | null; sprintTracker: boolean }[];
   products: { id: string; name: string }[];
   docTree: DocNode[];
 }) {
@@ -83,6 +94,13 @@ export function Sidebar({
   const looseProjects = projects.filter((p) => !p.productId || !productIds.has(p.productId));
   // top-level pages linked to a product are listed under it; sub-pages stay with their parent
   const looseDocs = docTree.filter((d) => !d.productId || !productIds.has(d.productId));
+  // every page linked to a product shows under it, nested under its parent when that is linked too
+  const allDocs: DocNode[] = [];
+  const walk = (nodes: DocNode[]) => nodes.forEach((n) => (allDocs.push(n), walk(n.children)));
+  walk(docTree);
+  const docById = new Map(allDocs.map((d) => [d.id, d]));
+  const productDocRoots = (productId: string) =>
+    allDocs.filter((d) => d.productId === productId && docById.get(d.parentId ?? "")?.productId !== productId);
   // On phones the sidebar is a drawer behind the ☰ button; on md+ it is always shown.
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -177,31 +195,42 @@ export function Sidebar({
               <div key={prod.id}>
                 <NavLink href={`/products/${prod.id}`}>{prod.name}</NavLink>
                 <div className="ml-3 space-y-0.5 border-l border-stone-200 pl-1">
+                  <SubHead href={`/products/${prod.id}?tab=projects`}>Projects</SubHead>
                   {projects
-                    .filter((p) => p.productId === prod.id)
+                    .filter((p) => p.productId === prod.id && !p.sprintTracker)
                     .map((p) => (
                       <NavLink key={p.id} href={`/projects/${p.id}`}>
                         <span className="mr-1.5 font-mono text-xs text-stone-400">{p.key}</span>
                         {p.name}
                       </NavLink>
                     ))}
-                  <div className="flex items-center justify-between px-2 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                    <Link href={`/products/${prod.id}?tab=docs`} className="hover:text-stone-700">
-                      Docs
-                    </Link>
-                    <form action={createProductDoc}>
-                      <input type="hidden" name="productId" value={prod.id} />
-                      <button className="px-1 text-sm font-normal text-stone-400 hover:text-stone-800" title={`New page in ${prod.name}`}>
-                        +
-                      </button>
-                    </form>
-                  </div>
+                  <SubHead href={`/products/${prod.id}?tab=sprints`}>Sprints</SubHead>
+                  <NavLink href={`/products/${prod.id}?tab=sprints`}>🏃 Sprint planning</NavLink>
+                  {projects
+                    .filter((p) => p.productId === prod.id && p.sprintTracker)
+                    .map((p) => (
+                      <NavLink key={p.id} href={`/projects/${p.id}`}>
+                        <span className="mr-1.5 font-mono text-xs text-stone-400">{p.key}</span>
+                        {p.name}
+                      </NavLink>
+                    ))}
+                  <SubHead
+                    href={`/products/${prod.id}?tab=docs`}
+                    action={
+                      <form action={createProductDoc}>
+                        <input type="hidden" name="productId" value={prod.id} />
+                        <button className="px-1 text-sm font-normal text-stone-400 hover:text-stone-800" title={`New page in ${prod.name}`}>
+                          +
+                        </button>
+                      </form>
+                    }
+                  >
+                    Docs
+                  </SubHead>
                   <ul>
-                    {docTree
-                      .filter((d) => d.productId === prod.id)
-                      .map((n) => (
-                        <DocItem key={n.id} node={n} depth={0} />
-                      ))}
+                    {productDocRoots(prod.id).map((n) => (
+                      <DocItem key={n.id} node={n} depth={0} defaultOpen />
+                    ))}
                   </ul>
                 </div>
               </div>

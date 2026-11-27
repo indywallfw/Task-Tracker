@@ -5,6 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extensions";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -20,6 +21,7 @@ export function RichEditor({
   placeholder?: string;
   minHeight?: string;
 }) {
+  const router = useRouter();
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveRef = useRef(onSave);
@@ -40,7 +42,20 @@ export function RichEditor({
       TableCell,
     ],
     content: initialHtml,
-    editorProps: { attributes: { class: `prose-doc ${minHeight}` } },
+    editorProps: {
+      attributes: { class: `prose-doc ${minHeight}` },
+      // links open on click: pages in this app in the same tab, other sites in a new one
+      handleClick: (_view, _pos, event) => {
+        const a = (event.target as HTMLElement | null)?.closest("a");
+        const href = a?.getAttribute("href");
+        if (!href || event.button !== 0) return false;
+        event.preventDefault();
+        const url = new URL(href, window.location.href);
+        if (url.origin === window.location.origin) router.push(url.pathname + url.search + url.hash);
+        else window.open(url.href, "_blank", "noopener,noreferrer");
+        return true;
+      },
+    },
     onUpdate: ({ editor }) => {
       setSaveState("saving");
       if (timer.current) clearTimeout(timer.current);

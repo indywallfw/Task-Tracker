@@ -57,6 +57,13 @@
       "when": 1795762175622,
       "tag": "0007_todo_task_link",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795767592821,
+      "tag": "0008_sprint_section",
+      "breakpoints": true
     }
   ]
 }

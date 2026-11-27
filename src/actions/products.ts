@@ -62,6 +62,16 @@ export async function updateProduct(formData: FormData) {
   refresh(productId);
 }
 
+/** Saves the sprint planning notes edited on the product's Sprints tab. */
+export async function saveSprintPlan(productId: string, html: string) {
+  await requireUser();
+  await db
+    .update(products)
+    .set({ sprintPlan: z.string().max(200000).parse(html) })
+    .where(eq(products.id, id.parse(productId)));
+  revalidatePath(`/products/${productId}`);
+}
+
 export async function setProductArchived(formData: FormData) {
   await requireAdmin();
   const productId = id.parse(formData.get("id"));
@@ -126,6 +136,20 @@ export async function setProjectProduct(formData: FormData) {
   }
   refresh(before?.productId);
   refresh(productId);
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/** Lists a project in its product's Sprints section (like Weekly Sprints) or with the other projects. */
+export async function setProjectSprintTracker(formData: FormData) {
+  await requireUser();
+  const projectId = id.parse(formData.get("projectId"));
+  const on = formData.get("sprintTracker") === "on";
+  const [p] = await db
+    .update(projects)
+    .set({ sprintTracker: on })
+    .where(eq(projects.id, projectId))
+    .returning({ productId: projects.productId });
+  refresh(p?.productId);
   revalidatePath(`/projects/${projectId}`);
 }
 

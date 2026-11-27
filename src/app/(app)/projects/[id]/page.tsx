@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, ne, type SQL } from "drizzle-orm";
+import { and, eq, inArray, ne, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db, products, projects, tasks } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -9,7 +9,10 @@ import { assigneeFilter, queryTasks, titleFilter } from "@/lib/tasks-query";
 import { STATUSES } from "@/lib/constants";
 import { PROJECT_STATUSES } from "@/lib/project-meta";
 import { getActiveProducts } from "@/lib/products";
-import { setProjectProduct, setProjectStatus, updateProjectText } from "@/actions/products";
+import { setProjectProduct, setProjectSprintTracker, setProjectStatus, updateProjectText } from "@/actions/products";
+import { Avatar } from "@/components/avatar";
+import { DueDate, PriorityText, StatusPill } from "@/components/task-bits";
+import type { TaskCard } from "@/lib/tasks-query";
 import { AutoSubmitSelect, SubmitOnBlurTextarea } from "@/components/auto-submit";
 import { setProjectArchived, updateProject } from "@/actions/tasks";
 import { PageHeader } from "@/components/page-header";
@@ -43,8 +46,10 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
 
   const where = [
     eq(tasks.projectId, id),
-    // the overview lists what is still pending
-    view === "overview" ? ne(tasks.status, "done") : undefined,
+    // the overview shows what is moving: work in progress, and urgent/high priority (P0/P1) work
+    view === "overview"
+      ? and(ne(tasks.status, "done"), or(eq(tasks.status, "in_progress"), inArray(tasks.priority, ["urgent", "high"])))
+      : undefined,
     assigneeFilter(assignee, user.id),
     titleFilter(q),
   ].filter(Boolean) as SQL[];
@@ -149,18 +154,25 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           </div>
 
           <section>
-            <div className="mb-2 flex items-baseline justify-between">
-              <h2 className="label mb-0">Pending tasks ({rows.length})</h2>
-              <Link href={link({ view: "board" })} className="text-xs text-stone-500 hover:underline">
-                Board with done tasks →
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="label mb-0">In progress and high priority, by person ({rows.length})</h2>
+              <Link href={link({ view: "list" })} className="text-xs text-stone-500 hover:underline">
+                All tasks →
               </Link>
             </div>
+            <p className="mb-3 text-xs text-stone-500">
+              Tasks in progress, plus anything Urgent (P0) or High (P1) that isn&apos;t done yet.
+            </p>
             <QuickAddTask projectId={id} people={people} />
             {rows.length ? (
-              <TaskTable tasks={rows} fields={project.fields} sort={sort} sortHref={(s) => link({ sort: s })} />
+              <div className="grid gap-4 lg:grid-cols-2">
+                {byPerson(rows).map((g) => (
+                  <PersonTasks key={g.id ?? "none"} name={g.name} tasks={g.tasks} />
+                ))}
+              </div>
             ) : (
               <p className="rounded-lg border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-500">
-                Nothing pending. Add a task above.
+                Nothing in progress or high priority. See all tasks in the list view.
               </p>
             )}
           </section>
@@ -221,6 +233,21 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           </div>
           <button className="btn-secondary">Save</button>
         </form>
+        {project.productId && (
+          <form action={setProjectSprintTracker} className="card mt-3 p-4">
+            <input type="hidden" name="projectId" value={project.id} />
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="sprintTracker" defaultChecked={project.sprintTracker} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Show under Sprints</span>
+                <span className="block text-xs text-stone-500">
+                  For sprint tracking like Weekly Sprints: listed in the product&apos;s Sprints section instead of with its projects.
+                </span>
+              </span>
+            </label>
+            <button className="btn-secondary mt-3">Save</button>
+          </form>
+        )}
         <form action={setProjectProduct} className="card mt-3 p-4">
           <input type="hidden" name="projectId" value={project.id} />
           <label className="label" htmlFor="pproduct">Product</label>
@@ -241,6 +268,65 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           </form>
         )}
       </details>
+    </div>
+  );
+}
+
+const RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+
+/** Groups tasks by owner (people A–Z, unassigned last); in-progress first, then by priority and due date. */
+function byPerson(rows: TaskCard[]) {
+  const groups = new Map<string, { id: string | null; name: string; tasks: TaskCard[] }>();
+  for (const t of rows) {
+    const key = t.assigneeId ?? "";
+    if (!groups.has(key)) groups.set(key, { id: t.assigneeId, name: t.assigneeName ?? "Not yet assigned", tasks: [] });
+    groups.get(key)!.tasks.push(t);
+  }
+  const sorted = [...groups.values()].sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || a.name.localeCompare(b.name));
+  for (const g of sorted)
+    g.tasks.sort(
+      (a, b) =>
+        Number(b.status === "in_progress") - Number(a.status === "in_progress") ||
+        RANK[a.priority] - RANK[b.priority] ||
+        (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"),
+    );
+  return sorted;
+}
+
+function PersonTasks({ name, tasks: list }: { name: string; tasks: TaskCard[] }) {
+  const working = list.filter((t) => t.status === "in_progress").length;
+  return (
+    <div className="card p-3">
+      <div className="mb-2 flex items-center gap-2">
+        {name === "Not yet assigned" ? (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-stone-300 text-xs text-stone-400">?</span>
+        ) : (
+          <Avatar name={name} />
+        )}
+        <span className="font-medium">{name}</span>
+        <span className="ml-auto text-xs text-stone-500">
+          {working} in progress · {list.length - working} more high priority
+        </span>
+      </div>
+      <ul className="divide-y divide-stone-100">
+        {list.map((t) => (
+          <li key={t.id}>
+            <Link href={`/tasks/${t.id}`} className="flex items-center gap-2 rounded px-1 py-1.5 text-sm hover:bg-stone-50">
+              <span className="w-16 shrink-0 font-mono text-xs text-stone-400">
+                {t.projectKey}-{t.number}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{t.title}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="hidden sm:inline">
+                  <StatusPill status={t.status} />
+                </span>
+                <PriorityText priority={t.priority} />
+                <DueDate date={t.dueDate} />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

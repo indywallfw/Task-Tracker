@@ -19,6 +19,7 @@ import { assigneeFilter, queryTasks, titleFilter, type TaskCard } from "@/lib/ta
 import { STATUSES, formatDate } from "@/lib/constants";
 import { PROJECT_STATUSES, projectStatus } from "@/lib/project-meta";
 import { PRODUCT_TEMPLATES } from "@/lib/product-templates";
+import { SprintPlanEditor } from "@/components/sprint-plan-editor";
 import { createProject } from "@/actions/tasks";
 import {
   addProductMember,
@@ -103,7 +104,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       {tab === "overview" && <Overview product={product} />}
       {tab === "projects" && <ProjectsTab productId={id} show={str(sp.show)} />}
       {tab === "tasks" && <TasksTab productId={id} sp={sp} userId={user.id} />}
-      {tab === "sprints" && <SprintsTab productId={id} selected={str(sp.sprint)} />}
+      {tab === "sprints" && <SprintsTab productId={id} selected={str(sp.sprint)} plan={product.sprintPlan} />}
       {tab === "people" && <PeopleTab productId={id} />}
       {tab === "docs" && <DocsTab productId={id} />}
 
@@ -451,7 +452,7 @@ async function TasksTab({
 
 type SprintRow = Awaited<ReturnType<typeof getProductSprints>>[number];
 
-async function SprintsTab({ productId, selected }: { productId: string; selected?: string }) {
+async function SprintsTab({ productId, selected, plan }: { productId: string; selected?: string; plan: string }) {
   const sprintRows = await getProductSprints(productId);
   const current =
     sprintRows.find((s) => s.id === selected) ?? sprintRows.find((s) => s.status === "active") ?? sprintRows.find((s) => s.status === "planned");
@@ -467,7 +468,41 @@ async function SprintsTab({ productId, selected }: { productId: string; selected
       ])
     : [[], []];
 
+  const trackers = projectRows.filter((p) => p.sprintTracker);
+
   return (
+    <div className="space-y-8">
+    <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
+      <div className="min-w-0">
+        <h2 className="label">Sprint planning</h2>
+        <div className="card px-4 py-2">
+          <SprintPlanEditor productId={productId} html={plan} />
+        </div>
+      </div>
+      <div>
+        <h2 className="label">Weekly tracking</h2>
+        {trackers.length ? (
+          <ul className="space-y-1">
+            {trackers.map((p) => (
+              <li key={p.id}>
+                <Link href={`/projects/${p.id}`} className="card block px-3 py-2 text-sm hover:bg-stone-50">
+                  <span className="mr-1.5 font-mono text-xs text-stone-400">{p.key}</span>
+                  {p.name}
+                  <span className="block text-xs text-stone-500">
+                    {p.open} open / {p.total} rows
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-stone-500">
+            None yet. Add Weekly sprints from the product Overview, or tick &ldquo;Show under Sprints&rdquo; in a project&apos;s settings.
+          </p>
+        )}
+      </div>
+    </section>
+
     <div className="grid gap-6 xl:grid-cols-[14rem_minmax(0,1fr)]">
       <aside className="space-y-4">
         <ul className="space-y-1">
@@ -525,6 +560,7 @@ async function SprintsTab({ productId, selected }: { productId: string; selected
       ) : (
         <Empty>Create a sprint to plan work from this product&apos;s projects into it.</Empty>
       )}
+    </div>
     </div>
   );
 }
