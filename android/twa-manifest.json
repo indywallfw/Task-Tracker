@@ -36,6 +36,6 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://workspace-1029942545777.asia-southeast1.run.app/",
-  "minSdkVersion": 21,
+  "minSdkVersion": 24,
   "orientationLock": false
 }
