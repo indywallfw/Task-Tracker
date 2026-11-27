@@ -17,8 +17,8 @@ export const PRODUCT_TEMPLATES = [
   },
   {
     value: "launch",
-    label: "Launch readiness pipeline",
-    hint: "A project with the launch gates, from feature freeze to go / no-go",
+    label: "Launch Readiness Pipeline",
+    hint: "A Launch Readiness Pipeline project with the launch gates, from feature freeze to go / no-go",
   },
 ] as const;
 export type ProductTemplate = (typeof PRODUCT_TEMPLATES)[number]["value"];

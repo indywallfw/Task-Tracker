@@ -315,7 +315,7 @@ export async function createSprintTask(_: FormState, formData: FormData): Promis
   return { ok: remind ? `Added ${task.ref} with a reminder in your To-dos.` : `Added ${task.ref}.` };
 }
 
-/** Adds the starter pieces (sprint planning, weekly sprints, launch pipeline) to an existing product. */
+/** Adds the starter pieces (sprint planning, Weekly Sprints, Launch Readiness Pipeline) to an existing product. */
 export async function addProductStarters(_: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const productId = id.parse(formData.get("productId"));
