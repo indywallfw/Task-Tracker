@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db, users } from "@/db";
 import { createSession, destroySession, requireUser } from "@/lib/auth";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { safeNext } from "@/lib/safe-next";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
@@ -21,7 +22,7 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
   const ok = user && user.active && (await verifyPassword(parsed.data.password, user.passwordHash));
   if (!ok) return { error: "Wrong email or password." };
   await createSession(user.id);
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function logout() {

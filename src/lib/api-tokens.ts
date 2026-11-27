@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { apiTokens, db, users } from "@/db";
 import type { CurrentUser } from "./auth";
+import { userFromAccessToken } from "./oauth";
 
 const hash = (t: string) => createHash("sha256").update(t).digest("hex");
 
@@ -12,8 +13,10 @@ export async function issueToken(userId: string, name: string) {
   return token;
 }
 
-/** Resolves "Authorization: Bearer tt_..." to an active user. */
+/** Resolves "Authorization: Bearer ..." (a personal tt_ token or an OAuth tto_ token) to an active user. */
 export async function userFromBearer(header: string | null): Promise<CurrentUser | null> {
+  const o = header?.match(/^Bearer\s+(tto_[A-Za-z0-9_-]+)$/);
+  if (o) return userFromAccessToken(o[1]);
   const m = header?.match(/^Bearer\s+(tt_[A-Za-z0-9_-]+)$/);
   if (!m) return null;
   const tokenHash = hash(m[1]);

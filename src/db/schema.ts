@@ -93,6 +93,50 @@ export const apiTokens = pgTable(
   (t) => [index("api_tokens_user_idx").on(t.userId)],
 );
 
+/** Apps (e.g. Claude) that registered themselves to sign people in with OAuth. */
+export const oauthClients = pgTable("oauth_clients", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  redirectUris: text("redirect_uris").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** One-time codes handed to the app after someone clicks Allow. Valid for a few minutes. */
+export const oauthCodes = pgTable("oauth_codes", {
+  // sha256 of the code
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+/** A person's connection from an OAuth app: a short-lived access token plus a refresh token. */
+export const oauthGrants = pgTable(
+  "oauth_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // sha256 hashes; the tokens themselves are never stored
+    accessHash: text("access_hash").notNull().unique(),
+    accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }).notNull(),
+    refreshHash: text("refresh_hash").notNull().unique(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("oauth_grants_user_idx").on(t.userId)],
+);
+
 /** A product groups projects, the people on it, its sprints and its documents. */
 export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
