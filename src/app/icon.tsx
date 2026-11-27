@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 export const size = { width: 512, height: 512 };
 export const contentType = "image/png";
 
-/** App icon for installed home-screen shortcuts: an "I" on the dark theme colour. */
+/** App icon for installed home-screen shortcuts: "ID" on the dark theme colour. */
 export default function Icon() {
   return new ImageResponse(
     (
@@ -16,12 +16,13 @@ export default function Icon() {
           justifyContent: "center",
           background: "#1a1817",
           color: "#f2f0ee",
-          fontSize: 300,
+          fontSize: 240,
           fontWeight: 700,
           fontFamily: "sans-serif",
+          letterSpacing: "-0.04em",
         }}
       >
-        I
+        ID
       </div>
     ),
     size,
