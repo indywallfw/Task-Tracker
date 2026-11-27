@@ -369,6 +369,8 @@ export const todos = pgTable(
     labels: text("labels").array().notNull().default(sql`'{}'::text[]`),
     // a RECURRENCES key, e.g. "daily", "weekdays", "weekly", "monthly", "yearly"
     recurrence: text("recurrence"),
+    // a reminder for a tracked task, e.g. added while planning a sprint
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
     position: doublePrecision("position").notNull().default(0),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,

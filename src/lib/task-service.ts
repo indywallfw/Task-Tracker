@@ -15,6 +15,7 @@ export async function insertTask(input: {
   dueDate?: string | null;
   leadId?: string | null;
   properties?: Record<string, string>;
+  sprintId?: string | null;
 }) {
   const status = input.status ?? "todo";
   return db.transaction(async (tx) => {
@@ -41,6 +42,7 @@ export async function insertTask(input: {
         dueDate: input.dueDate ?? null,
         leadId: input.leadId ?? null,
         properties: input.properties ?? {},
+        sprintId: input.sprintId ?? null,
         creatorId: input.creatorId,
         position: (pos?.p ?? 0) + 1000,
         completedAt: status === "done" ? new Date() : null,

@@ -63,6 +63,11 @@ export function TodoItem({
             {firstNote && <div className="truncate text-xs text-stone-500">{firstNote}</div>}
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-500">
               <DueChip todo={todo} today={today} />
+              {todo.taskId && (
+                <Link href={`/tasks/${todo.taskId}`} className="text-sky-700 hover:underline">
+                  ↗ Open task
+                </Link>
+              )}
               {todo.recurrence && <span title={recurrenceLabel(todo.recurrence)}>↻ {recurrenceLabel(todo.recurrence)}</span>}
               {todo.subtasks.length > 0 && (
                 <span>

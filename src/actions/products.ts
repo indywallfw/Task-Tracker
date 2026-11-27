@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNull, max, ne } from "drizzle-orm";
 import { z } from "zod";
-import { db, docs, productMembers, products, projects, sprints, tasks } from "@/db";
+import { db, docs, productMembers, products, projects, sprints, tasks, todos } from "@/db";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { PROJECT_STATUSES, SPRINT_STATUSES } from "@/lib/project-meta";
 import { PRODUCT_TEMPLATES, seedProductTemplates } from "@/lib/product-templates";
+import { insertTask } from "@/lib/task-service";
 import type { FormState } from "./auth";
 
 const id = z.uuid();
@@ -243,6 +244,64 @@ export async function setTaskSprint(formData: FormData) {
   refresh(t.productId);
   revalidatePath(`/tasks/${taskId}`);
   revalidatePath(`/projects/${t.projectId}`);
+}
+
+/**
+ * Creates a task straight into a sprint. The task lands in the chosen project's
+ * task list like any other; "remind me" also adds a to-do for the person adding it.
+ */
+export async function createSprintTask(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const sprintId = id.parse(formData.get("sprintId"));
+  const title = z.string().trim().max(300).parse(formData.get("title") ?? "");
+  if (!title) return { error: "Give the task a title." };
+  const projectId = z.uuid().safeParse(formData.get("projectId"));
+  if (!projectId.success) return { error: "Pick the project the task belongs to." };
+  const assigneeId = optionalId.parse(formData.get("assigneeId") ?? "");
+  const dueDate = optionalDate.parse(formData.get("dueDate") ?? "");
+  const remind = formData.get("remind") === "on";
+  const remindDate = optionalDate.parse(formData.get("remindDate") ?? "") ?? dueDate;
+  const remindTime = z
+    .string()
+    .optional()
+    .transform((v) => v || null)
+    .pipe(z.string().regex(/^\d{2}:\d{2}$/).nullable())
+    .parse(formData.get("remindTime") ?? "");
+
+  const [s] = await db.select({ productId: sprints.productId, name: sprints.name }).from(sprints).where(eq(sprints.id, sprintId));
+  const [p] = await db.select({ productId: projects.productId }).from(projects).where(eq(projects.id, projectId.data));
+  if (!s || !p || p.productId !== s.productId) return { error: "That project isn't part of this product." };
+
+  const task = await insertTask({ projectId: projectId.data, title, creatorId: user.id, assigneeId, dueDate, sprintId });
+  if (remind) {
+    const [pos] = await db.select({ p: max(todos.position) }).from(todos).where(eq(todos.userId, user.id));
+    await db.insert(todos).values({
+      userId: user.id,
+      title: `${task.ref} ${title}`.slice(0, 300),
+      notes: `Sprint task in ${s.name}`,
+      dueDate: remindDate,
+      dueTime: remindDate ? remindTime : null,
+      taskId: task.id,
+      position: (pos?.p ?? 0) + 1000,
+    });
+    revalidatePath("/todos", "layout");
+  }
+  refresh(s.productId);
+  revalidatePath(`/projects/${projectId.data}`);
+  return { ok: remind ? `Added ${task.ref} with a reminder in your To-dos.` : `Added ${task.ref}.` };
+}
+
+/** Adds the starter pieces (sprint planning, weekly sprints, launch pipeline) to an existing product. */
+export async function addProductStarters(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const productId = id.parse(formData.get("productId"));
+  const chosen = PRODUCT_TEMPLATES.map((t) => t.value).filter((v) => formData.get(`template_${v}`) === "on");
+  if (!chosen.length) return { error: "Tick at least one." };
+  const [p] = await db.select({ id: products.id, name: products.name }).from(products).where(eq(products.id, productId));
+  if (!p) return { error: "Product not found." };
+  await seedProductTemplates(p, user.id, chosen);
+  refresh(productId);
+  return { ok: "Added." };
 }
 
 // ---------- docs ----------

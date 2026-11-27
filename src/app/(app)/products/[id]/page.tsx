@@ -18,12 +18,15 @@ import {
 import { assigneeFilter, queryTasks, titleFilter, type TaskCard } from "@/lib/tasks-query";
 import { STATUSES, formatDate } from "@/lib/constants";
 import { PROJECT_STATUSES, projectStatus } from "@/lib/project-meta";
+import { PRODUCT_TEMPLATES } from "@/lib/product-templates";
 import { createProject } from "@/actions/tasks";
 import {
   addProductMember,
+  addProductStarters,
   addTasksToSprint,
   createProductDoc,
   createSprint,
+  createSprintTask,
   deleteSprint,
   linkDocToProduct,
   removeProductMember,
@@ -103,6 +106,24 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       {tab === "sprints" && <SprintsTab productId={id} selected={str(sp.sprint)} />}
       {tab === "people" && <PeopleTab productId={id} />}
       {tab === "docs" && <DocsTab productId={id} />}
+
+      {tab === "overview" && !product.archived && (
+        <details className="mt-10 max-w-xl">
+          <summary className="cursor-pointer text-sm text-stone-500">Add starter pieces</summary>
+          <ActionForm action={addProductStarters} submitLabel="Add" className="card mt-3 space-y-3 p-4">
+            <input type="hidden" name="productId" value={product.id} />
+            {PRODUCT_TEMPLATES.map((t) => (
+              <label key={t.value} className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name={`template_${t.value}`} className="mt-0.5" />
+                <span>
+                  <span className="font-medium">{t.label}</span>
+                  <span className="block text-xs text-stone-500">{t.hint}</span>
+                </span>
+              </label>
+            ))}
+          </ActionForm>
+        </details>
+      )}
 
       {tab === "overview" && user.role === "admin" && !product.archived && (
         <details className="mt-10 max-w-xl">
@@ -436,6 +457,7 @@ async function SprintsTab({ productId, selected }: { productId: string; selected
     sprintRows.find((s) => s.id === selected) ?? sprintRows.find((s) => s.status === "active") ?? sprintRows.find((s) => s.status === "planned");
   const base = `/products/${productId}?tab=sprints`;
 
+  const [projectRows, people] = await Promise.all([getProductProjects(productId), getActiveUsers()]);
   const [sprintTasks, backlog] = current
     ? await Promise.all([
         queryTasks([eq(tasks.sprintId, current.id)]),
@@ -493,7 +515,13 @@ async function SprintsTab({ productId, selected }: { productId: string; selected
       </aside>
 
       {current ? (
-        <SprintDetail sprint={current} sprintTasks={sprintTasks} backlog={backlog} />
+        <SprintDetail
+          sprint={current}
+          sprintTasks={sprintTasks}
+          backlog={backlog}
+          projectOptions={projectRows.filter((p) => p.status !== "done")}
+          people={people}
+        />
       ) : (
         <Empty>Create a sprint to plan work from this product&apos;s projects into it.</Empty>
       )}
@@ -505,10 +533,14 @@ function SprintDetail({
   sprint,
   sprintTasks,
   backlog,
+  projectOptions,
+  people,
 }: {
   sprint: SprintRow;
   sprintTasks: TaskCard[];
   backlog: TaskCard[];
+  projectOptions: { id: string; key: string; name: string }[];
+  people: { id: string; name: string }[];
 }) {
   return (
     <div className="min-w-0 space-y-5">
@@ -533,6 +565,58 @@ function SprintDetail({
       </div>
       {sprint.status === "active" && (
         <p className="text-xs text-stone-500">Completing the sprint sends its unfinished tasks back to the backlog.</p>
+      )}
+
+      {sprint.status !== "completed" && projectOptions.length > 0 && (
+        <details className="card p-4" open={sprintTasks.length === 0}>
+          <summary className="cursor-pointer font-medium">+ Add a task to this sprint</summary>
+          <ActionForm action={createSprintTask} submitLabel="Add task" resetOnSuccess className="mt-3 space-y-3">
+            <input type="hidden" name="sprintId" value={sprint.id} />
+            <input className="input" name="title" placeholder="What needs doing?" required aria-label="Task title" />
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="text-xs text-stone-500">
+                Project
+                <select className="input mt-0.5 py-1.5" name="projectId" required defaultValue={projectOptions[0].id}>
+                  {projectOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.key} · {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-stone-500">
+                Owner
+                <select className="input mt-0.5 py-1.5" name="assigneeId" defaultValue="">
+                  <option value="">Unassigned</option>
+                  {people.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-stone-500">
+                Due
+                <input className="input mt-0.5 py-1.5" type="date" name="dueDate" defaultValue={sprint.endDate ?? ""} />
+              </label>
+            </div>
+            <div className="flex flex-wrap items-end gap-3 rounded-md bg-stone-50 p-2">
+              <label className="flex items-center gap-2 self-center text-sm">
+                <input type="checkbox" name="remind" />
+                Remind me in To-dos
+              </label>
+              <label className="text-xs text-stone-500">
+                On
+                <input className="input mt-0.5 py-1.5" type="date" name="remindDate" />
+              </label>
+              <label className="text-xs text-stone-500">
+                At
+                <input className="input mt-0.5 py-1.5" type="time" name="remindTime" />
+              </label>
+              <p className="w-full text-xs text-stone-500">Leave the date empty to be reminded on the due date.</p>
+            </div>
+          </ActionForm>
+        </details>
       )}
 
       {sprintTasks.length ? (

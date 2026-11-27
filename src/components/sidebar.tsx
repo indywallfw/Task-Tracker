@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/actions/auth";
 import { createDoc } from "@/actions/docs";
+import { createProductDoc } from "@/actions/products";
 import type { CurrentUser } from "@/lib/auth";
 import type { DocNode } from "@/lib/data";
 
@@ -79,6 +80,8 @@ export function Sidebar({
   const productIds = new Set(products.map((p) => p.id));
   // projects of an archived product are listed with the loose ones so they stay reachable
   const looseProjects = projects.filter((p) => !p.productId || !productIds.has(p.productId));
+  // top-level pages linked to a product are listed under it; sub-pages stay with their parent
+  const looseDocs = docTree.filter((d) => !d.productId || !productIds.has(d.productId));
   // On phones the sidebar is a drawer behind the ☰ button; on md+ it is always shown.
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -177,6 +180,24 @@ export function Sidebar({
                         {p.name}
                       </NavLink>
                     ))}
+                  <div className="flex items-center justify-between px-2 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                    <Link href={`/products/${prod.id}?tab=docs`} className="hover:text-stone-700">
+                      Docs
+                    </Link>
+                    <form action={createProductDoc}>
+                      <input type="hidden" name="productId" value={prod.id} />
+                      <button className="px-1 text-sm font-normal text-stone-400 hover:text-stone-800" title={`New page in ${prod.name}`}>
+                        +
+                      </button>
+                    </form>
+                  </div>
+                  <ul>
+                    {docTree
+                      .filter((d) => d.productId === prod.id)
+                      .map((n) => (
+                        <DocItem key={n.id} node={n} depth={0} />
+                      ))}
+                  </ul>
                 </div>
               </div>
             ))}
@@ -212,7 +233,7 @@ export function Sidebar({
         <div>
           <div className="flex items-center justify-between px-2 pb-1">
             <Link href="/docs" className="label mb-0 hover:text-stone-800">
-              Docs
+              {products.length ? "Other docs" : "Docs"}
             </Link>
             <form action={createDoc}>
               <button className="px-1 text-stone-400 hover:text-stone-800" title="New page">
@@ -221,7 +242,7 @@ export function Sidebar({
             </form>
           </div>
           <ul>
-            {docTree.map((n) => (
+            {looseDocs.map((n) => (
               <DocItem key={n.id} node={n} depth={0} />
             ))}
           </ul>

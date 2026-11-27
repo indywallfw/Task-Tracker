@@ -7,12 +7,13 @@ export type DocNode = {
   title: string;
   icon: string | null;
   parentId: string | null;
+  productId: string | null;
   children: DocNode[];
 };
 
 export async function getDocTree(): Promise<DocNode[]> {
   const rows = await db
-    .select({ id: docs.id, title: docs.title, icon: docs.icon, parentId: docs.parentId })
+    .select({ id: docs.id, title: docs.title, icon: docs.icon, parentId: docs.parentId, productId: docs.productId })
     .from(docs)
     .orderBy(asc(docs.position), asc(docs.createdAt));
   const byId = new Map<string, DocNode>();

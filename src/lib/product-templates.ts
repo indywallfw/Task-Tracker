@@ -1,5 +1,5 @@
 import "server-only";
-import { inArray, isNull, max } from "drizzle-orm";
+import { eq, inArray, isNull, max } from "drizzle-orm";
 import { db, docs, projects, sprints } from "@/db";
 import { insertTask } from "@/lib/task-service";
 
@@ -12,8 +12,8 @@ export const PRODUCT_TEMPLATES = [
   },
   {
     value: "weekly",
-    label: "Weekly tracker",
-    hint: "A project with one row per week: goal, planned, completed, retro",
+    label: "Weekly sprints",
+    hint: "A Weekly Sprints project with one row per week: goal, planned, completed, retro",
   },
   {
     value: "launch",
@@ -70,17 +70,20 @@ async function nextDocPosition() {
   return (row?.p ?? 0) + 1000;
 }
 
-function sprintPlanningDoc(product: string, hasWeekly: boolean, hasLaunch: boolean) {
+function sprintPlanningDoc(product: string, productId: string, hasWeekly: boolean, hasLaunch: boolean) {
+  const board = `/products/${productId}?tab=sprints`;
   const steps = [
     "Each week gets a sprint in the product's Sprints tab, with a goal and dates.",
+    "Add new work with \"Add a task to this sprint\" on the sprint board. It goes into the chosen project's task list, and you can tick \"Remind me\" to put a reminder in your To-dos.",
     "Before the sprint starts, pull tasks from the backlog into it and give each one an owner.",
     "During the week, move tasks across the sprint board as they progress.",
     "At the end of the week, complete the sprint. Unfinished tasks go back to the backlog for the next one.",
   ];
-  if (hasWeekly) steps.push("Record the goal, what was planned, what got done and retro notes in the Weekly Tracker.");
+  if (hasWeekly) steps.push("Record the goal, what was planned, what got done and retro notes in Weekly Sprints.");
   if (hasLaunch) steps.push("Plan sprint work against the Launch Readiness Pipeline gates.");
   const html = [
     `<p>Weekly sprint planning and tracking for ${escape(product)}.</p>`,
+    `<p><a href="${board}">Open the sprint board →</a></p>`,
     `<h2>Cadence</h2>`,
     `<p>Sprints run weekly, Monday to Friday. Planning happens on Monday morning and the review on Friday afternoon.</p>`,
     `<h2>Team</h2>`,
@@ -92,6 +95,7 @@ function sprintPlanningDoc(product: string, hasWeekly: boolean, hasLaunch: boole
   ].join("");
   const text = [
     `Weekly sprint planning and tracking for ${product}.`,
+    "Open the sprint board →",
     "Cadence",
     "Sprints run weekly, Monday to Friday. Planning happens on Monday morning and the review on Friday afternoon.",
     "Team",
@@ -144,11 +148,11 @@ export async function seedProductTemplates(
   const week = nextWorkWeek();
 
   if (want.has("weekly")) {
-    const key = await freeKey(["WT", `${pre}WT`, `${pre}WK`]);
+    const key = await freeKey(["WS", `${pre}WS`, `${pre}WK`]);
     const [p] = await db
       .insert(projects)
       .values({
-        name: "Weekly Tracker",
+        name: "Weekly Sprints",
         key,
         description: "One row per week: the sprint goal, what was planned, what got done, and retro notes.",
         status: "active",
@@ -167,7 +171,7 @@ export async function seedProductTemplates(
   }
 
   if (want.has("sprint")) {
-    const { html, text } = sprintPlanningDoc(product.name, want.has("weekly"), want.has("launch"));
+    const { html, text } = sprintPlanningDoc(product.name, product.id, want.has("weekly"), want.has("launch"));
     await db.insert(docs).values({
       title: `${product.name} Sprint Planning`,
       icon: "🗓️",
@@ -178,7 +182,10 @@ export async function seedProductTemplates(
       createdById: userId,
       updatedById: userId,
     });
-    await db.insert(sprints).values({
+    // only start the numbering if the product has no sprints yet
+    const existing = await db.select({ id: sprints.id }).from(sprints).where(eq(sprints.productId, product.id)).limit(1);
+    if (!existing.length)
+      await db.insert(sprints).values({
       productId: product.id,
       name: "Sprint 1",
       goal: "",
