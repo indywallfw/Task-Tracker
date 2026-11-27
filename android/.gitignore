@@ -1,0 +1,10 @@
+# signing keys and build output stay on your machine
+*.keystore
+*.jks
+*.apk
+*.aab
+*.idsig
+app/build/
+build/
+.gradle/
+local.properties

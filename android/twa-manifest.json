@@ -1,0 +1,41 @@
+{
+  "packageId": "com.indypendance.app",
+  "host": "workspace-1029942545777.asia-southeast1.run.app",
+  "name": "IndypenDance",
+  "launcherName": "IndypenDance",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#1A1817",
+  "themeColorDark": "#1A1817",
+  "navigationColor": "#1A1817",
+  "navigationColorDark": "#1A1817",
+  "navigationDividerColor": "#1A1817",
+  "navigationDividerColorDark": "#1A1817",
+  "backgroundColor": "#1A1817",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon",
+  "maskableIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./indypendance-upload.keystore",
+    "alias": "upload"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    { "name": "To-dos", "shortName": "To-dos", "url": "/todos/today", "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon" },
+    { "name": "My work", "shortName": "My work", "url": "/", "chosenIconUrl": "https://workspace-1029942545777.asia-southeast1.run.app/icon" }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://workspace-1029942545777.asia-southeast1.run.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://workspace-1029942545777.asia-southeast1.run.app/",
+  "minSdkVersion": 21,
+  "orientationLock": false
+}
