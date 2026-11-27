@@ -20,5 +20,5 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // API routes authenticate themselves (session cookie or API token).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icon|apple-icon|api/|\\.well-known/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icon|apple-icon|brand/|api/|\\.well-known/).*)"],
 };

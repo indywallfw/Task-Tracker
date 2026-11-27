@@ -1,10 +1,11 @@
 import { ImageResponse } from "next/og";
-import { IdMark } from "@/components/id-mark";
+import { brandDataUri } from "@/lib/brand";
 
-export const size = { width: 512, height: 512 };
+export const size = { width: 64, height: 64 };
 export const contentType = "image/png";
 
-/** App icon for installed home-screen shortcuts: a bold "ID" on the dark theme colour. */
+/** Browser tab icon: the Shield note on transparent. */
 export default function Icon() {
-  return new ImageResponse(<IdMark size={512} />, size);
+  // eslint-disable-next-line @next/next/no-img-element
+  return new ImageResponse(<img src={brandDataUri("symbol")} width={64} height={64} alt="" />, size);
 }

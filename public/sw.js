@@ -12,8 +12,9 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "IndypenDance", {
       body: data.body || "",
-      icon: "/icon",
-      badge: "/icon",
+      icon: "/brand/icon-192.png",
+      // Android shows the badge as a single-colour shape in the status bar
+      badge: "/brand/badge-96.png",
       tag: data.tag,
       renotify: !!data.tag,
       data: { url: data.url || "/" },

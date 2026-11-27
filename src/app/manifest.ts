@@ -15,10 +15,11 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: THEME_COLORS.dark,
     theme_color: THEME_COLORS.dark,
     icons: [
-      { src: "/icon", sizes: "512x512", type: "image/png", purpose: "any" },
-      // the mark sits well inside the square, so Android can crop it into any icon shape
-      { src: "/icon", sizes: "512x512", type: "image/png", purpose: "maskable" },
-      { src: "/apple-icon", sizes: "180x180", type: "image/png" },
+      { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      // full-bleed navy with the mark inside the safe zone, so Android can crop it into any shape
+      { src: "/brand/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/brand/mono-192.png", sizes: "192x192", type: "image/png", purpose: "monochrome" },
     ],
   };
 }
